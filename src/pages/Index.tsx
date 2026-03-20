@@ -114,6 +114,10 @@ const Index = () => {
 
       <div className="amber-rule" />
 
+      {/* Feature — AI Chat */}
+      <FeatureChatSection />
+
+      <div className="amber-rule" />
 
       {/* Example Prompts */}
       <section id="examples" className="container py-24">
