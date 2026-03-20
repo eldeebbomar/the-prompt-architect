@@ -7,6 +7,7 @@ import HowItWorksSection from "@/components/HowItWorksSection";
 import FeatureChatSection from "@/components/FeatureChatSection";
 import FeaturePromptsSection from "@/components/FeaturePromptsSection";
 import FeatureRevisionSection from "@/components/FeatureRevisionSection";
+import TestimonialsSection from "@/components/TestimonialsSection";
 
 const examplePrompts = [
   "Set up Supabase auth with email/password and Google OAuth, including protected route wrappers",
@@ -128,6 +129,11 @@ const Index = () => {
 
       {/* Feature — Revision & Loop */}
       <FeatureRevisionSection />
+
+      <div className="amber-rule" />
+
+      {/* Testimonials */}
+      <TestimonialsSection />
 
       <div className="amber-rule" />
 
