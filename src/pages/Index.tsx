@@ -104,10 +104,8 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Right column — 45% */}
-        <div
-          className="flex items-center justify-center lg:w-[45%]"
-        >
+        {/* Right column — 45%, hidden on mobile */}
+        <div className="hidden items-center justify-center sm:flex lg:w-[45%]">
           <PromptCardStack />
         </div>
       </section>
