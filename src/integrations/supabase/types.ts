@@ -241,6 +241,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_credits: {
+        Args: {
+          p_amount: number
+          p_plan: string
+          p_stripe_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      check_credits: { Args: { p_user_id: string }; Returns: number }
+      deduct_credit: {
+        Args: { p_description: string; p_project_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      get_credit_stats: { Args: { p_user_id: string }; Returns: Json }
       owns_project: { Args: { _project_id: string }; Returns: boolean }
     }
     Enums: {
