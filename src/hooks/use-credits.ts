@@ -11,7 +11,7 @@ export interface CreditStats {
 export function useCredits() {
   return useQuery({
     queryKey: ["credits"],
-    queryFn: async () => {
+    staleTime: 60_000,
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
