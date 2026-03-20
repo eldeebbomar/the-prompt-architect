@@ -456,7 +456,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             <h2 className="font-heading text-sm text-foreground truncate">{project.name}</h2>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors" aria-label="Chat options">
+                <button className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors" aria-label="Chat options">
                   <Settings2 className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
