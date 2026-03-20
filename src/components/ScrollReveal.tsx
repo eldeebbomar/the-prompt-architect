@@ -20,7 +20,7 @@ const ScrollReveal = ({ children, className = "", delay = 0 }: ScrollRevealProps
           observer.unobserve(el);
         }
       },
-      { threshold: 0.2 }
+      { threshold: 0.15 }
     );
     observer.observe(el);
     return () => observer.disconnect();
