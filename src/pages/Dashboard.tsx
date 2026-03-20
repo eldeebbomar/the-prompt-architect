@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Coins, FolderOpen, FileText, ArrowRight } from "lucide-react";
+import { Plus, Coins, FolderOpen, FileText, ArrowRight, Compass } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
 import { useRecentProjects, useProjectCount, usePromptCount } from "@/hooks/use-projects";
@@ -168,10 +168,17 @@ const Dashboard = () => {
           </div>
         ) : !projects?.length ? (
           <div className="flex flex-col items-center justify-center rounded-card border border-border bg-card px-8 py-14 text-center">
-            <FolderOpen className="mb-3 h-10 w-10 text-muted-foreground/30" />
-            <p className="font-body text-sm text-muted-foreground">
-              No projects yet. Start your first one above!
+            <Compass className="mb-4 h-12 w-12 text-primary/50" />
+            <h3 className="font-heading text-xl text-foreground">Your workshop is empty</h3>
+            <p className="mt-2 max-w-sm font-body text-sm text-muted-foreground">
+              Start by creating your first project.
             </p>
+            <button
+              onClick={() => navigate("/dashboard/new")}
+              className="mt-5 inline-flex items-center gap-2 rounded-button bg-primary px-5 py-2.5 font-body text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.97]"
+            >
+              <Plus className="h-4 w-4" /> Create a Project
+            </button>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">

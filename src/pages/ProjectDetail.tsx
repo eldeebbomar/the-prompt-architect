@@ -101,6 +101,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationDone, setGenerationDone] = useState(false);
   const [promptCount, setPromptCount] = useState(0);
+  const autoSentRef = useRef(false);
 
   const allMessages = (() => {
     const real = messages ?? [];
@@ -128,6 +129,67 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     });
     return phase;
   })();
+
+  // Auto-send project description as first message
+  useEffect(() => {
+    if (autoSentRef.current || messagesLoading) return;
+    if (messages && messages.length === 0 && project.description) {
+      autoSentRef.current = true;
+      setInput(project.description);
+      // Delay to let state settle, then trigger send
+      setTimeout(() => {
+        const syntheticText = project.description!;
+        setInput("");
+        setSending(true);
+
+        const tempId = `opt-${Date.now()}`;
+        setOptimisticMessages((prev) => [
+          ...prev,
+          { id: tempId, role: "user", content: syntheticText, created_at: new Date().toISOString(), phase: "discovery", project_id: id, metadata: {} },
+        ]);
+
+        (async () => {
+          try {
+            await supabase.from("conversations").insert({ project_id: id, role: "user", content: syntheticText, phase: "discovery" });
+            setIsTyping(true);
+
+            const { data: invokeData, error: invokeError } = await supabase.functions.invoke("discovery-webhook", {
+              body: { project_id: id, message: syntheticText },
+            });
+
+            setIsTyping(false);
+
+            if (invokeError) {
+              toast.error("Failed to reach AI architect. Please try again.");
+              setSending(false);
+              return;
+            }
+
+            const { reply, phase: respPhase, is_complete, spec_data } = invokeData as {
+              reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
+            };
+
+            await supabase.from("conversations").insert({
+              project_id: id, role: "assistant", content: reply, phase: respPhase || "discovery",
+              metadata: spec_data ? ({ spec_data } as unknown as Json) : {},
+            });
+
+            if (spec_data && Object.keys(spec_data).length > 0) {
+              const currentSpec = typeof project.spec_data === "object" && project.spec_data !== null ? project.spec_data : {};
+              await supabase.from("projects").update({ spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as Json }).eq("id", id);
+            }
+
+            queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+            queryClient.invalidateQueries({ queryKey: ["project", id] });
+          } catch {
+            toast.error("Failed to reach AI architect. Please try again.");
+            setIsTyping(false);
+          }
+          setSending(false);
+        })();
+      }, 100);
+    }
+  }, [messages, messagesLoading, project.description, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSend = async () => {
     const text = input.trim();
@@ -262,7 +324,14 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
               </div>
             ) : !allMessages.length ? (
               <div className="flex h-full items-center justify-center">
-                <p className="font-body text-sm text-muted-foreground">Start your discovery conversation…</p>
+                <div className="w-full max-w-[400px] rounded-card border border-border bg-card p-8 text-center">
+                  <p className="font-heading text-xl text-foreground">
+                    Hi! I'm your LovPlan Architect 🏗
+                  </p>
+                  <p className="mt-2 font-body text-sm text-muted-foreground">
+                    I'll ask you about your app idea, target users, features, and tech preferences. Let's start!
+                  </p>
+                </div>
               </div>
             ) : (
               <>
