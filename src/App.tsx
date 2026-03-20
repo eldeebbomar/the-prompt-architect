@@ -38,7 +38,7 @@ const App = () => (
             {/* Dashboard layout with sidebar */}
             <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard/new" element={<Dashboard />} />
+              <Route path="/dashboard/new" element={<NewProject />} />
               <Route path="/dashboard/projects" element={<MyProjects />} />
               <Route path="/dashboard/billing" element={<Dashboard />} />
               <Route path="/dashboard/settings" element={<Dashboard />} />
