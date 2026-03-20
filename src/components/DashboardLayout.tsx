@@ -156,7 +156,7 @@ const DashboardLayout = () => {
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-              <SheetTrigger asChild className="md:hidden">
+              <SheetTrigger asChild className="lg:hidden">
                 <Button variant="ghost" size="icon" className="shrink-0">
                   <Menu className="h-5 w-5" />
                 </Button>
