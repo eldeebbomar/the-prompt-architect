@@ -276,10 +276,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       setIsTyping(false);
 
       if (invokeError) {
-        const msg = invokeError.message || "";
-        if (msg.includes("401") || msg.includes("Unauthorized")) { toast.error("Session expired. Please sign in again."); navigate("/login"); return; }
-        if (msg.includes("402") || msg.includes("No credits")) { toast.error("You need credits to continue."); navigate("/pricing"); return; }
-        throw invokeError;
+        if (!handleWebhookError(invokeError, navigate, { setCreditsModalOpen, onRateLimit: handleRateLimit })) {
+          toast.error("Something went wrong. Please try again.");
+        }
+        return;
       }
 
       const { reply, phase, is_complete } = invokeData as {
