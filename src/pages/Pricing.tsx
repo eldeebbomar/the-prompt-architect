@@ -2,6 +2,7 @@ import { Check, Minus } from "lucide-react";
 import PricingSection from "@/components/PricingSection";
 import CtaFooter from "@/components/CtaFooter";
 import ScrollReveal from "@/components/ScrollReveal";
+import SEO from "@/components/SEO";
 
 const comparisonRows = [
   {
