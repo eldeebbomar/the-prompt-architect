@@ -4,6 +4,7 @@ import { ArrowRight, PlayCircle, CheckCircle2 } from "lucide-react";
 import PromptCardStack from "@/components/PromptCardStack";
 import ProblemSection from "@/components/ProblemSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
+import FeatureChatSection from "@/components/FeatureChatSection";
 
 const examplePrompts = [
   "Set up Supabase auth with email/password and Google OAuth, including protected route wrappers",
@@ -113,6 +114,10 @@ const Index = () => {
 
       <div className="amber-rule" />
 
+      {/* Feature — AI Chat */}
+      <FeatureChatSection />
+
+      <div className="amber-rule" />
 
       {/* Example Prompts */}
       <section id="examples" className="container py-24">
