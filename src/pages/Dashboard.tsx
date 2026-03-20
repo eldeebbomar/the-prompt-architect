@@ -1,10 +1,13 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Coins, FolderOpen, FileText, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
 import { useRecentProjects, useProjectCount, usePromptCount } from "@/hooks/use-projects";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   discovery: { label: "Discovery", className: "border-primary/50 text-primary" },
