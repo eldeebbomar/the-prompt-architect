@@ -14,7 +14,7 @@ export interface PromptData {
   depends_on?: number[];
 }
 
-export function usePromptExport(projectId: string, prompts: PromptData[]) {
+export function usePromptExport(projectId: string, prompts: PromptData[], metadata?: Json) {
   const storageKey = STORAGE_KEY_PREFIX + projectId;
 
   const [copiedSet, setCopiedSet] = useState<Set<string>>(() => {
