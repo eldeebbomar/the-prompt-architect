@@ -84,6 +84,7 @@ const DashboardLayout = () => {
               key={item.href}
               to={item.href}
               onClick={() => isMobile && setMobileOpen(false)}
+              {...(item.href === "/dashboard/new" ? { "data-tutorial": "new-project-nav" } : {})}
               className={`group flex items-center gap-3 rounded-button px-3 py-2.5 font-body text-sm transition-all duration-200 ${
                 active
                   ? "border-l-[3px] border-l-primary bg-[hsl(40_8%_10%)] text-primary"
