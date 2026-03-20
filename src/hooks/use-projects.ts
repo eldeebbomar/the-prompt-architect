@@ -1,6 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export function useProjectCount() {
+  return useQuery({
+    queryKey: ["project-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("projects")
+        .select("*", { count: "exact", head: true });
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+}
+
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
