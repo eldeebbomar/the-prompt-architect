@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
+import PromptViewer from "@/components/PromptViewer";
 
 interface OptimisticMessage {
   id: string;
