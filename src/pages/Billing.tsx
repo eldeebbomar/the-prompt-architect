@@ -153,8 +153,12 @@ const Billing = () => {
             ))}
           </div>
         ) : transactions.length === 0 ? (
-          <div className="rounded-card border border-border bg-card px-6 py-10 text-center">
-            <p className="font-body text-sm text-muted-foreground">No transactions yet.</p>
+          <div className="flex flex-col items-center justify-center rounded-card border border-border bg-card px-6 py-14 text-center">
+            <Coins className="mb-4 h-12 w-12 text-primary/50" />
+            <h3 className="font-heading text-xl text-foreground">No transactions yet</h3>
+            <p className="mt-2 max-w-sm font-body text-sm text-muted-foreground">
+              Your purchase and usage history will appear here.
+            </p>
           </div>
         ) : (
           <>
