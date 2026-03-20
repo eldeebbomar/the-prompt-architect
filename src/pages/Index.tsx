@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, PlayCircle, CheckCircle2 } from "lucide-react";
+import ScrollReveal from "@/components/ScrollReveal";
 import PromptCardStack from "@/components/PromptCardStack";
 import ProblemSection from "@/components/ProblemSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
