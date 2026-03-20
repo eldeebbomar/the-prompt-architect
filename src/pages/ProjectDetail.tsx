@@ -373,8 +373,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   const handleEndDiscovery = async () => {
     try {
-      await supabase.from("conversations").insert({ project_id: id, role: "system", content: "✓ Discovery ended early. Review your project spec.", phase: "discovery" });
-      await supabase.from("projects").update({ status: "generating" }).eq("id", id);
+      // Invoke edge function to end discovery — n8n handles status + system message
+      await supabase.functions.invoke("discovery-webhook", {
+        body: { project_id: id, message: "__END_DISCOVERY__" },
+      });
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       toast.info("Discovery ended. Review your spec and generate prompts.");
