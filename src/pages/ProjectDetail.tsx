@@ -331,9 +331,14 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   // Delete message
   const handleDeleteMessage = async (messageId: string) => {
-    await supabase.from("conversations").delete().eq("id", messageId);
-    queryClient.invalidateQueries({ queryKey: ["conversations", id] });
-    toast.success("Message deleted.");
+    try {
+      const { error } = await supabase.from("conversations").delete().eq("id", messageId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+      toast.success("Message deleted.");
+    } catch {
+      toast.error("Failed to delete message.");
+    }
   };
 
   // Export conversation as markdown
