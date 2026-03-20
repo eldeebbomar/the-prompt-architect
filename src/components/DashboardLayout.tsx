@@ -188,7 +188,7 @@ const DashboardLayout = () => {
                 Buy Credits
               </Button>
             </Link>
-            <div className="hidden h-9 w-9 items-center justify-center rounded-full bg-primary/15 font-body text-sm font-medium text-primary md:flex">
+            <div className="hidden h-9 w-9 items-center justify-center rounded-full bg-primary/15 font-body text-sm font-medium text-primary lg:flex">
               {profile?.full_name?.charAt(0)?.toUpperCase() || profile?.email?.charAt(0)?.toUpperCase() || "U"}
             </div>
           </div>
