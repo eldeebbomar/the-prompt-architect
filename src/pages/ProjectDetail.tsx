@@ -262,7 +262,14 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
               </div>
             ) : !allMessages.length ? (
               <div className="flex h-full items-center justify-center">
-                <p className="font-body text-sm text-muted-foreground">Start your discovery conversation…</p>
+                <div className="w-full max-w-[400px] rounded-card border border-border bg-card p-8 text-center">
+                  <p className="font-heading text-xl text-foreground">
+                    Hi! I'm your LovPlan Architect 🏗
+                  </p>
+                  <p className="mt-2 font-body text-sm text-muted-foreground">
+                    I'll ask you about your app idea, target users, features, and tech preferences. Let's start!
+                  </p>
+                </div>
               </div>
             ) : (
               <>

@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import DashboardLayout from "./components/DashboardLayout";
 import Index from "./pages/Index";
@@ -22,37 +23,39 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            {/* Public layout with navbar */}
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-              <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
-              <Route path="/pricing" element={<Pricing />} />
-            </Route>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              {/* Public layout with navbar */}
+              <Route element={<MainLayout />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+                <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
+                <Route path="/pricing" element={<Pricing />} />
+              </Route>
 
-            {/* Dashboard layout with sidebar */}
-            <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard/new" element={<NewProject />} />
-              <Route path="/dashboard/projects" element={<MyProjects />} />
-              <Route path="/dashboard/billing" element={<Billing />} />
-              <Route path="/dashboard/settings" element={<Settings />} />
-              <Route path="/project/:id" element={<ProjectDetail />} />
-              <Route path="/project/:id/revise" element={<ProjectRevision />} />
-            </Route>
+              {/* Dashboard layout with sidebar */}
+              <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard/new" element={<NewProject />} />
+                <Route path="/dashboard/projects" element={<MyProjects />} />
+                <Route path="/dashboard/billing" element={<Billing />} />
+                <Route path="/dashboard/settings" element={<Settings />} />
+                <Route path="/project/:id" element={<ProjectDetail />} />
+                <Route path="/project/:id/revise" element={<ProjectRevision />} />
+              </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
