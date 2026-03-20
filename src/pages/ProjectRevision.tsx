@@ -115,7 +115,12 @@ const ProjectRevision = () => {
 
       setIsTyping(false);
 
-      if (invokeError) throw invokeError;
+      if (invokeError) {
+        if (!handleWebhookError(invokeError, navigate, { onRateLimit: handleRateLimit })) {
+          throw invokeError;
+        }
+        return;
+      }
 
       const { reply, changed_prompts, new_prompts, deleted_prompt_ids, success } =
         invokeData as {
