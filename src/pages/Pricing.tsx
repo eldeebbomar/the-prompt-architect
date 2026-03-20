@@ -54,7 +54,7 @@ const CellValue = ({ value }: { value: boolean | string }) => {
 
 const Pricing = () => (
   <div>
-    {/* Hero */}
+    <SEO title="Pricing" description="Choose a plan for your LovPlan AI prompt blueprints. Every credit includes a full AI discovery session, 50+ structured prompts, revisions, and loop prompts." />
     <section className="container pt-32 pb-8 text-center">
       <ScrollReveal>
         <h1 className="font-heading text-[36px] leading-[1.1] text-foreground md:text-[44px]">
