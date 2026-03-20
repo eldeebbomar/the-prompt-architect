@@ -5,68 +5,81 @@ const promptCards = [
     category: "INFRASTRUCTURE",
     categoryColor: "hsl(var(--amber))",
     title: "Design System & Layout",
-    preview: 'Create a design system with warm obsidian tokens. Define --background, --card, --primary colors in index.css...',
+    preview:
+      "Create a design system with warm obsidian tokens. Define --background, --card, --primary colors in index.css...",
   },
   {
     category: "BACKEND",
     categoryColor: "hsl(var(--sage))",
     title: "Supabase Schema",
-    preview: "Create profiles, projects, and conversations tables with proper RLS policies...",
+    preview:
+      "Create profiles, projects, and conversations tables with proper RLS policies...",
   },
   {
     category: "FRONTEND",
     categoryColor: "hsl(var(--blue-steel))",
     title: "Dashboard Layout",
-    preview: "Build a responsive dashboard with sidebar navigation and project cards...",
+    preview:
+      "Build a responsive dashboard with sidebar navigation and project cards...",
   },
   {
     category: "POLISH",
     categoryColor: "hsl(var(--warm-gray))",
     title: "Animations & Micro-interactions",
-    preview: "Add scroll-triggered reveals, hover states, and loading skeletons...",
+    preview:
+      "Add scroll-triggered reveals, hover states, and loading skeletons...",
   },
 ];
 
 const PromptCardStack = () => {
-  const [visibleCards, setVisibleCards] = useState<number[]>([]);
+  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
-    promptCards.forEach((_, i) => {
-      setTimeout(() => {
-        setVisibleCards((prev) => [...prev, i]);
-      }, i * 150 + 400);
-    });
+    const t = setTimeout(() => setEntered(true), 300);
+    return () => clearTimeout(t);
   }, []);
 
   return (
     <div className="relative flex h-full items-center justify-center">
       {/* Floating amber dots */}
-      <div className="absolute right-8 top-12 h-2 w-2 rounded-full bg-primary/40 animate-float" style={{ animationDelay: "0s" }} />
-      <div className="absolute left-4 top-1/3 h-1.5 w-1.5 rounded-full bg-primary/25 animate-float" style={{ animationDelay: "2s" }} />
-      <div className="absolute bottom-16 right-16 h-2.5 w-2.5 rounded-full bg-primary/30 animate-float" style={{ animationDelay: "4s" }} />
-      <div className="absolute left-12 bottom-24 h-1.5 w-1.5 rounded-full bg-primary/20 animate-float" style={{ animationDelay: "1s" }} />
+      <div
+        className="absolute right-8 top-12 h-2 w-2 rounded-full bg-primary/40 animate-float"
+        style={{ animationDelay: "0s" }}
+      />
+      <div
+        className="absolute left-4 top-1/3 h-1.5 w-1.5 rounded-full bg-primary/25 animate-float"
+        style={{ animationDelay: "2s" }}
+      />
+      <div
+        className="absolute bottom-16 right-16 h-2.5 w-2.5 rounded-full bg-primary/30 animate-float"
+        style={{ animationDelay: "4s" }}
+      />
 
-      {/* Card stack */}
-      <div className="relative w-full max-w-[260px] sm:max-w-[300px] lg:max-w-[340px]">
+      {/* Card stack — uses negative margins to overlap cards naturally */}
+      <div className="flex w-full max-w-[280px] flex-col items-center lg:max-w-[340px]">
         {promptCards.map((card, i) => {
-          const offsetY = i * 48;
-          const rotate = i * 1;
-          const scale = 1 - i * 0.03;
-          const zIndex = promptCards.length - i;
-          const isVisible = visibleCards.includes(i);
+          const isTop = i === 0;
+          // Each card after the first pulls up to overlap the one above
+          const marginTop = i === 0 ? 0 : -12;
+          const rotate = i % 2 === 0 ? i * 0.8 : i * -0.6;
+          const translateX = i % 2 === 0 ? i * 4 : i * -3;
 
           return (
             <div
               key={card.category}
-              className="absolute left-0 right-0 rounded-card border border-border p-5 transition-all duration-500"
+              className="w-full rounded-xl border border-border p-4 lg:p-5 transition-all duration-700"
               style={{
-                background: `hsl(var(--prompt-card))`,
-                boxShadow: "inset 0 1px 1px hsl(38 76% 56% / 0.03), 0 4px 24px rgba(15, 14, 12, 0.6)",
-                transform: isVisible
-                  ? `translateY(${offsetY}px) rotate(${rotate}deg) scale(${scale})`
-                  : `translateY(${offsetY + 30}px) rotate(${rotate}deg) scale(${scale})`,
-                zIndex,
-                opacity: isVisible ? 1 : 0,
+                background: "hsl(var(--prompt-card))",
+                boxShadow:
+                  "0 2px 12px rgba(15, 14, 12, 0.5), 0 0 0 1px rgba(61, 56, 48, 0.3)",
+                marginTop,
+                position: "relative",
+                zIndex: promptCards.length - i,
+                transform: entered
+                  ? `rotate(${rotate}deg) translateX(${translateX}px)`
+                  : `rotate(${rotate}deg) translateX(${translateX}px) translateY(24px)`,
+                opacity: entered ? 1 : 0,
+                transitionDelay: `${i * 120}ms`,
                 transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
               }}
             >
@@ -75,22 +88,21 @@ const PromptCardStack = () => {
                 style={{
                   color: card.categoryColor,
                   border: `1px solid ${card.categoryColor}`,
-                  background: "transparent",
                 }}
               >
                 {card.category}
               </span>
-              <h4 className="mb-1.5 font-heading text-base text-foreground">{card.title}</h4>
-              {i === 0 && (
-                <p className="font-mono text-xs leading-relaxed text-muted-foreground line-clamp-2">
+              <h4 className="font-heading text-sm text-foreground lg:text-base">
+                {card.title}
+              </h4>
+              {isTop && (
+                <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
                   {card.preview}
                 </p>
               )}
             </div>
           );
         })}
-        {/* Spacer for container height */}
-        <div style={{ height: `${(promptCards.length - 1) * 48 + 140}px` }} />
       </div>
     </div>
   );
