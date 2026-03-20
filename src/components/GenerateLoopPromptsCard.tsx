@@ -31,7 +31,12 @@ const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) =>
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (!handleWebhookError(error, navigate)) {
+          throw error;
+        }
+        return;
+      }
 
       // n8n saves loop prompts to generated_prompts — just refetch
       queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });

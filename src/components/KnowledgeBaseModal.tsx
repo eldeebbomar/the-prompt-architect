@@ -65,7 +65,15 @@ const KnowledgeBaseModal = ({
         body: JSON.stringify({ project_id: projectId, user_id: user.id }),
       });
 
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      if (!res.ok) {
+        const status = res.status;
+        if (status === 400) { toast.error("Missing required information. Please try again."); return; }
+        if (status === 401) { toast.error("Session expired. Please sign in again."); return; }
+        if (status === 402) { toast.error("You need credits to continue."); return; }
+        if (status === 429) { toast.info("You're sending messages too fast. Please wait a moment."); return; }
+        if (status === 500) { toast.error("Something went wrong on our end. Please try again."); return; }
+        throw new Error(`Request failed: ${status}`);
+      }
       const result = await res.json();
 
       if (!result.success || !result.knowledge_base) {
