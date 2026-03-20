@@ -115,6 +115,7 @@ const Index = () => {
       {/* Problem / Solution */}
       <ProblemSection />
 
+      <div className="amber-rule" />
 
       {/* How it Works */}
       <HowItWorksSection />
