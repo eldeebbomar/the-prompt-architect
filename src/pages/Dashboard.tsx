@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Coins, FolderOpen, FileText, ArrowRight } from "lucide-react";
+import { Plus, Coins, FolderOpen, FileText, ArrowRight, Compass } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
 import { useRecentProjects, useProjectCount, usePromptCount } from "@/hooks/use-projects";
