@@ -69,6 +69,7 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
         prompt_text: p.prompt_text,
         is_loop: p.is_loop,
         depends_on: p.depends_on,
+        repeat_count: (p as Record<string, unknown>).repeat_count as number | null | undefined,
       })),
     [prompts]
   );
