@@ -52,6 +52,16 @@ const ProjectRevision = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
   const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
+
+  const handleRateLimit = useCallback(() => {
+    setRateLimited(true);
+    setSending(true);
+    setTimeout(() => {
+      setRateLimited(false);
+      setSending(false);
+    }, 5000);
+  }, []);
 
   // Revision result for diff panel
   const [revisionResult, setRevisionResult] = useState<RevisionResult | null>(null);
