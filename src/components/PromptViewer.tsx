@@ -468,7 +468,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
                         {prompt.title}
                       </span>
                       {isCopied ? (
-                        <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))]" />
+                        <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))] copy-pop" />
                       ) : (
                         <button
                           onClick={(e) => {
