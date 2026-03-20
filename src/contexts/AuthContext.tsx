@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Set up listener BEFORE getSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      async (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
         if (newSession?.user) {
@@ -67,6 +67,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setProfile(null);
         }
+
+        // Handle session expiry
+        if (event === "SIGNED_OUT" && session !== null) {
+          // Session was active before → user got logged out (expiry or explicit)
+          setProfile(null);
+        }
+
         setLoading(false);
       }
     );
