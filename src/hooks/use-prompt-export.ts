@@ -10,6 +10,7 @@ export interface PromptData {
   purpose: string;
   prompt_text: string;
   is_loop: boolean;
+  depends_on?: number[];
 }
 
 export function usePromptExport(projectId: string, prompts: PromptData[]) {

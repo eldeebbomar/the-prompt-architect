@@ -1,10 +1,17 @@
-import { useState, useMemo } from "react";
-import { Copy, Check, RefreshCw, Download, Sparkles } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Copy, Check, RefreshCw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useGeneratedPrompts } from "@/hooks/use-generated-prompts";
 import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
 import ExportModal from "@/components/ExportModal";
+import PromptDetailPanel from "@/components/PromptDetailPanel";
 import CopyConfetti from "@/components/CopyConfetti";
 import { toast } from "sonner";
 
@@ -37,6 +44,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   const promptData: PromptData[] = useMemo(
     () =>
@@ -48,6 +56,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
         purpose: p.purpose,
         prompt_text: p.prompt_text,
         is_loop: p.is_loop,
+        depends_on: p.depends_on,
       })),
     [prompts]
   );
@@ -62,7 +71,6 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
     downloadMarkdown,
   } = usePromptExport(projectId, promptData);
 
-  // Category counts
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: promptData.length };
     promptData.forEach((p) => {
@@ -72,7 +80,6 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
     return counts;
   }, [promptData]);
 
-  // Filtered prompts
   const filteredPrompts = useMemo(() => {
     if (activeCategory === "ALL") return promptData;
     return promptData.filter(
@@ -80,17 +87,27 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
     );
   }, [promptData, activeCategory]);
 
-  // Selected prompt
   const selectedPrompt = useMemo(() => {
     if (!selectedPromptId) return filteredPrompts[0] ?? null;
     return promptData.find((p) => p.id === selectedPromptId) ?? null;
   }, [selectedPromptId, promptData, filteredPrompts]);
 
-  const handleCopyPrompt = async (prompt: PromptData) => {
-    await navigator.clipboard.writeText(prompt.prompt_text);
-    markCopied(prompt.id);
-    toast.success("Prompt copied! Paste it into Lovable.");
-  };
+  const handleCopyPrompt = useCallback(
+    async (prompt: PromptData) => {
+      await navigator.clipboard.writeText(prompt.prompt_text);
+      markCopied(prompt.id);
+      toast.success("Prompt copied! Paste it into Lovable.");
+    },
+    [markCopied]
+  );
+
+  const handleSelectPrompt = useCallback((id: string) => {
+    setSelectedPromptId(id);
+    // On mobile, open the sheet
+    if (window.innerWidth < 1024) {
+      setMobileDetailOpen(true);
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -122,27 +139,47 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
 
       {allCopied && <CopyConfetti active={allCopied} />}
 
+      {/* Mobile detail sheet */}
+      <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
+        <SheetContent
+          side="bottom"
+          className="h-[85vh] rounded-t-2xl border-t-border bg-background p-0 lg:hidden"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>Prompt Detail</SheetTitle>
+          </SheetHeader>
+          <PromptDetailPanel
+            prompt={selectedPrompt}
+            allPrompts={promptData}
+            copiedSet={copiedSet}
+            onCopy={handleCopyPrompt}
+            onSelectPrompt={handleSelectPrompt}
+            projectId={projectId}
+          />
+        </SheetContent>
+      </Sheet>
+
       <div className="flex h-[calc(100vh-64px)] flex-col">
         {/* Top header */}
-        <div className="shrink-0 border-b border-border bg-card px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="font-heading text-2xl text-foreground">
+        <div className="shrink-0 border-b border-border bg-card px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <h1 className="font-heading text-lg md:text-2xl text-foreground truncate">
                 {projectName}
               </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-button border border-[hsl(var(--sage))]/50 bg-[hsl(var(--sage))]/10 px-3 py-1 font-body text-xs font-medium text-[hsl(var(--sage))]">
+              <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded-button border border-[hsl(var(--sage))]/50 bg-[hsl(var(--sage))]/10 px-3 py-1 font-body text-xs font-medium text-[hsl(var(--sage))]">
                 <Check className="h-3 w-3" />
                 {totalCount} Prompts Ready
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                className="hidden sm:inline-flex gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                Revise Prompts
+                <span className="hidden md:inline">Revise Prompts</span>
               </Button>
               <Button
                 variant="amber"
@@ -151,7 +188,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
                 onClick={() => setExportOpen(true)}
               >
                 <Download className="h-3.5 w-3.5" />
-                Export All
+                <span className="hidden sm:inline">Export All</span>
               </Button>
             </div>
           </div>
@@ -232,7 +269,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
           </div>
 
           {/* Prompt list (center) */}
-          <div className="flex-1 min-w-0 overflow-y-auto border-r border-border md:max-w-[50%] lg:max-w-none lg:flex-[1_1_0]">
+          <div className="flex-1 min-w-0 overflow-y-auto border-r border-border lg:flex-[1_1_0]">
             {/* Mobile category pills */}
             <div className="flex gap-1.5 overflow-x-auto border-b border-border px-4 py-3 md:hidden">
               {CATEGORY_ORDER.map((cat) => {
@@ -269,29 +306,20 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
                 return (
                   <button
                     key={prompt.id}
-                    onClick={() => setSelectedPromptId(prompt.id)}
+                    onClick={() => handleSelectPrompt(prompt.id)}
                     className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors group ${
-                      isSelected
-                        ? "bg-primary/5"
-                        : "hover:bg-muted/20"
+                      isSelected ? "bg-primary/5" : "hover:bg-muted/20"
                     }`}
                   >
-                    {/* Sequence number */}
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/40 font-body text-xs text-muted-foreground">
                       {prompt.sequence_order}
                     </div>
-
-                    {/* Category dot */}
                     <div
                       className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`}
                     />
-
-                    {/* Title */}
                     <span className="flex-1 min-w-0 truncate font-body text-sm font-medium text-foreground">
                       {prompt.title}
                     </span>
-
-                    {/* Copy / Copied */}
                     {isCopied ? (
                       <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))]" />
                     ) : (
@@ -309,81 +337,35 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
                 );
               })}
             </div>
+
+            {/* Mobile progress bar */}
+            <div className="border-t border-border p-4 md:hidden">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-body text-[10px] text-muted-foreground">
+                  {copiedCount}/{totalCount} copied
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-500"
+                  style={{
+                    width: `${totalCount > 0 ? (copiedCount / totalCount) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Prompt detail (right) */}
-          <div className="hidden w-[40%] shrink-0 overflow-y-auto bg-background p-6 lg:block">
-            {selectedPrompt ? (
-              <div>
-                {/* Category + loop badge */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-button px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wider ${
-                      selectedPrompt.category.toUpperCase() === "LOOP"
-                        ? "border border-primary text-primary"
-                        : "bg-primary/10 text-primary"
-                    }`}
-                  >
-                    {selectedPrompt.category}
-                  </span>
-                  {selectedPrompt.is_loop && (
-                    <span className="inline-flex items-center gap-1 rounded-button border border-primary/30 px-2 py-0.5 font-body text-[10px] text-primary">
-                      <Sparkles className="h-3 w-3" />
-                      Loop
-                    </span>
-                  )}
-                  <span className="font-body text-[10px] text-muted-foreground">
-                    #{selectedPrompt.sequence_order}
-                  </span>
-                </div>
-
-                {/* Title */}
-                <h2 className="font-heading text-xl text-foreground mb-2">
-                  {selectedPrompt.title}
-                </h2>
-
-                {/* Purpose */}
-                <p className="font-body text-sm text-muted-foreground mb-6">
-                  {selectedPrompt.purpose}
-                </p>
-
-                {/* Prompt text */}
-                <div className="rounded-card border border-border bg-[hsl(var(--surface-elevated))] p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-body text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Prompt
-                    </span>
-                    <Button
-                      variant={copiedSet.has(selectedPrompt.id) ? "ghost" : "amber"}
-                      size="sm"
-                      className="h-7 gap-1.5 text-xs"
-                      onClick={() => handleCopyPrompt(selectedPrompt)}
-                    >
-                      {copiedSet.has(selectedPrompt.id) ? (
-                        <>
-                          <Check className="h-3 w-3 text-[hsl(var(--sage))]" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3" />
-                          Copy Prompt
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground/90">
-                    {selectedPrompt.prompt_text}
-                  </pre>
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <p className="font-body text-sm text-muted-foreground">
-                  Select a prompt to preview
-                </p>
-              </div>
-            )}
+          {/* Desktop detail panel */}
+          <div className="hidden w-[40%] shrink-0 bg-background lg:block">
+            <PromptDetailPanel
+              prompt={selectedPrompt}
+              allPrompts={promptData}
+              copiedSet={copiedSet}
+              onCopy={handleCopyPrompt}
+              onSelectPrompt={handleSelectPrompt}
+              projectId={projectId}
+            />
           </div>
         </div>
       </div>
