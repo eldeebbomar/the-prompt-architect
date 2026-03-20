@@ -74,6 +74,41 @@ const plans = [
 ];
 
 const PricingSection = () => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const priceTypeMap: Record<string, string> = {
+    "Single": "single",
+    "5-Pack": "pack",
+    "Unlimited": "unlimited",
+  };
+
+  const handleCheckout = async (planName: string) => {
+    if (!user) {
+      window.location.href = "/signup";
+      return;
+    }
+
+    const priceType = priceTypeMap[planName];
+    if (!priceType) return;
+
+    setLoading(priceType);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+        body: { price_type: priceType },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error("Checkout error:", err);
+      toast.error("Failed to start checkout. Please try again.");
+    } finally {
+      setLoading(null);
+    }
+  };
   return (
     <section id="pricing" className="container py-24">
       {/* Header */}
