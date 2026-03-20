@@ -180,6 +180,31 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {/* View toggle */}
+              <div className="hidden sm:flex items-center rounded-full border border-border p-0.5">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-body text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                    viewMode === "list"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <List className="h-3 w-3" />
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode("graph")}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-body text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                    viewMode === "graph"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <GitBranch className="h-3 w-3" />
+                  Graph
+                </button>
+              </div>
               <Button
                 variant="outline"
                 size="sm"
