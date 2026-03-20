@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
 import PromptViewer from "@/components/PromptViewer";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 /* ──────── 404 card ──────── */
 const ProjectNotFound = () => (
