@@ -10,7 +10,7 @@ const chatMessages = [
 const promptList = [
   { cat: "INFRA", color: "hsl(var(--amber))", title: "Design system tokens" },
   { cat: "BACKEND", color: "hsl(var(--sage))", title: "Database schema & RLS" },
-  { cat: "FRONTEND", color: "#6B8EBF", title: "Dashboard layout" },
+  { cat: "FRONTEND", color: "hsl(var(--blue-steel))", title: "Dashboard layout" },
 ];
 
 const queueItems = [

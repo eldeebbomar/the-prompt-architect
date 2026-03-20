@@ -58,6 +58,7 @@ export default {
         amber: "hsl(var(--amber))",
         sage: "hsl(var(--sage))",
         terracotta: "hsl(var(--terracotta))",
+        "blue-steel": "hsl(var(--blue-steel))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
