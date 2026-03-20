@@ -101,6 +101,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationDone, setGenerationDone] = useState(false);
   const [promptCount, setPromptCount] = useState(0);
+  const autoSentRef = useRef(false);
 
   const allMessages = (() => {
     const real = messages ?? [];
