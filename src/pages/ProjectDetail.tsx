@@ -215,20 +215,18 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
               return;
             }
 
-            const { reply, phase: respPhase, is_complete, spec_data } = invokeData as {
+            const { reply, phase: respPhase } = invokeData as {
               reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
             };
 
-            await supabase.from("conversations").insert({
-              project_id: id, role: "assistant", content: reply, phase: respPhase || "discovery",
-              metadata: spec_data ? ({ spec_data } as unknown as Json) : {},
-            });
+            // Display reply optimistically
+            const tempAssistantId = `opt-assistant-${Date.now()}`;
+            setOptimisticMessages((prev) => [
+              ...prev,
+              { id: tempAssistantId, role: "assistant", content: reply, created_at: new Date().toISOString(), phase: respPhase || "discovery", project_id: id, metadata: {} },
+            ]);
 
-            if (spec_data && Object.keys(spec_data).length > 0) {
-              const currentSpec = typeof project.spec_data === "object" && project.spec_data !== null ? project.spec_data : {};
-              await supabase.from("projects").update({ spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as Json }).eq("id", id);
-            }
-
+            // n8n saves assistant message, spec_data, and status — just refetch
             queryClient.invalidateQueries({ queryKey: ["conversations", id] });
             queryClient.invalidateQueries({ queryKey: ["project", id] });
           } catch {
