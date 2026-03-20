@@ -45,7 +45,7 @@ const Index = () => {
 
           {/* Headline */}
           <h1
-            className="font-heading text-[36px] leading-[1.08] text-foreground opacity-0 animate-fade-up md:text-[56px]"
+            className="font-heading text-[32px] leading-[1.08] text-foreground opacity-0 animate-fade-up sm:text-[36px] md:text-[56px]"
             style={{ animationDelay: "100ms" }}
           >
             Stop prompting blindly.

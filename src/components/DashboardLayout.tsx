@@ -157,7 +157,7 @@ const DashboardLayout = () => {
             {/* Mobile hamburger */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild className="lg:hidden">
-                <Button variant="ghost" size="icon" className="shrink-0">
+                <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
