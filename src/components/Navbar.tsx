@@ -1,0 +1,93 @@
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
+const navLinks = [
+  { label: "How it Works", href: "/#how-it-works" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Examples", href: "/#examples" },
+];
+
+const Navbar = () => {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+
+  return (
+    <header className="sticky top-0 z-50 h-16 border-b border-[hsl(var(--nav-border))] bg-[hsl(var(--nav-bg))] backdrop-blur-sm">
+      <div className="container flex h-full items-center justify-between">
+        {/* Logo */}
+        <Link to="/" className="font-heading text-xl tracking-[0.05em] text-primary">
+          LovPlan
+        </Link>
+
+        {/* Desktop nav */}
+        <nav className="hidden items-center gap-8 md:flex">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              to={link.href}
+              className="font-body text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Desktop actions */}
+        <div className="hidden items-center gap-4 md:flex">
+          <Link to="/login">
+            <Button variant="navLink" size="sm">Sign In</Button>
+          </Link>
+          <Link to="/signup">
+            <Button variant="amber" size="default">Start Building</Button>
+          </Link>
+        </div>
+
+        {/* Mobile hamburger */}
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild className="md:hidden">
+            <Button variant="ghost" size="icon">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="border-l-border bg-card">
+            <SheetHeader>
+              <SheetTitle className="font-heading text-xl tracking-[0.05em] text-primary">
+                LovPlan
+              </SheetTitle>
+            </SheetHeader>
+            <nav className="mt-8 flex flex-col gap-6">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setOpen(false)}
+                  className="font-body text-base text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {link.label}
+                </Link>
+              ))}
+              <div className="amber-rule my-2" />
+              <Link to="/login" onClick={() => setOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start">Sign In</Button>
+              </Link>
+              <Link to="/signup" onClick={() => setOpen(false)}>
+                <Button variant="amber" className="w-full">Start Building</Button>
+              </Link>
+            </nav>
+          </SheetContent>
+        </Sheet>
+      </div>
+    </header>
+  );
+};
+
+export default Navbar;

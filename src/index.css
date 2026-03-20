@@ -1,96 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Warm obsidian palette */
+    --background: 30 12% 6%;
+    --foreground: 36 30% 93%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 33 10% 9%;
+    --card-foreground: 36 30% 93%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 33 10% 9%;
+    --popover-foreground: 36 30% 93%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 38 76% 56%;
+    --primary-foreground: 30 12% 6%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 140 16% 55%;
+    --secondary-foreground: 36 30% 93%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 33 8% 12%;
+    --muted-foreground: 30 10% 56%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 33 12% 14%;
+    --accent-foreground: 36 30% 93%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 16 56% 59%;
+    --destructive-foreground: 36 30% 93%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 33 12% 21%;
+    --input: 33 12% 21%;
+    --ring: 38 76% 56%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Custom tokens */
+    --surface-elevated: 36 10% 11%;
+    --nav-bg: 33 10% 9%;
+    --nav-border: 30 10% 15%;
+    --amber: 38 76% 56%;
+    --sage: 140 16% 55%;
+    --terracotta: 16 56% 59%;
+    --warm-white: 36 30% 93%;
+    --warm-gray: 30 10% 56%;
+    --prompt-card: 40 8% 10%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 33 10% 9%;
+    --sidebar-foreground: 36 30% 93%;
+    --sidebar-primary: 38 76% 56%;
+    --sidebar-primary-foreground: 30 12% 6%;
+    --sidebar-accent: 33 12% 14%;
+    --sidebar-accent-foreground: 36 30% 93%;
+    --sidebar-border: 33 12% 21%;
+    --sidebar-ring: 38 76% 56%;
   }
 }
 
@@ -100,6 +65,39 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-body antialiased;
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+/* Blueprint grid pattern */
+.blueprint-grid {
+  background-image:
+    linear-gradient(hsl(33 10% 9% / 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(33 10% 9% / 0.6) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Prompt card inner glow */
+.prompt-card {
+  background: hsl(var(--prompt-card));
+  box-shadow: inset 0 1px 1px hsl(38 76% 56% / 0.03), 0 4px 24px rgba(15, 14, 12, 0.6);
+}
+
+/* Amber divider */
+.amber-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--amber) / 0.3), transparent);
+}
+
+/* Warm shadow utility */
+.shadow-warm {
+  box-shadow: 0 4px 24px rgba(15, 14, 12, 0.6);
+}
+
+.shadow-warm-lg {
+  box-shadow: 0 8px 40px rgba(15, 14, 12, 0.7);
 }
