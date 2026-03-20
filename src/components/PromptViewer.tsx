@@ -50,6 +50,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   const promptData: PromptData[] = useMemo(
