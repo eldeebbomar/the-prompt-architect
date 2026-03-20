@@ -83,7 +83,7 @@ const Dashboard = () => {
           ) : (
             <>
               <p className="font-heading text-4xl tabular-nums text-foreground">
-                {projects?.length ?? 0}
+                {projectCount ?? 0}
               </p>
               <p className="mt-1 font-body text-xs text-muted-foreground">projects created</p>
             </>
