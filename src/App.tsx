@@ -20,6 +20,7 @@ const NewProject = lazy(() => import("./pages/NewProject"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const ProjectRevision = lazy(() => import("./pages/ProjectRevision"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const Examples = lazy(() => import("./pages/Examples"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Billing = lazy(() => import("./pages/Billing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -67,6 +68,7 @@ const App = () => (
                     <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
                     <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
                     <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/examples" element={<Examples />} />
                   </Route>
 
                   {/* Dashboard layout with sidebar */}
