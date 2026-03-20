@@ -170,3 +170,30 @@ html {
   0% { left: 0; }
   100% { left: calc(100% - 8px); }
 }
+
+/* Chat message entrance */
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Phase dot glow */
+@keyframes phase-glow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(38 76% 56% / 0); }
+  50% { box-shadow: 0 0 8px 3px hsl(38 76% 56% / 0.4); }
+}
+
+.phase-dot-active {
+  animation: phase-glow 2s ease-in-out infinite;
+}
+
+/* Copy success pop */
+@keyframes copy-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.copy-pop {
+  animation: copy-pop 400ms ease-out;
+}
