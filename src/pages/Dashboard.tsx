@@ -18,7 +18,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { data: stats, isLoading: statsLoading } = useCreditStats();
-  const { data: projects, isLoading: projectsLoading } = useRecentProjects(4);
+  const { data: projectCount, isLoading: projectsLoading } = useProjectCount();
+  const { data: projects, isLoading: recentLoading } = useRecentProjects(4);
   const { data: promptCount, isLoading: promptsLoading } = usePromptCount();
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
