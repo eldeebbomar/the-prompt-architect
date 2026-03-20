@@ -109,32 +109,10 @@ const Index = () => {
 
 
       {/* How it Works */}
-      <section id="how-it-works" className="container py-24">
-        <h2
-          className="mb-16 text-center font-heading text-3xl text-foreground opacity-0 animate-fade-up md:text-4xl"
-        >
-          Three steps to a finished app
-        </h2>
-        <div className="grid gap-8 md:grid-cols-3">
-          {steps.map((step, i) => (
-            <div
-              key={step.title}
-              className="rounded-card border border-border bg-card p-8 opacity-0 animate-fade-up transition-shadow duration-300 hover:shadow-warm"
-              style={{ animationDelay: `${i * 100 + 100}ms` }}
-            >
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-button bg-primary/10">
-                <step.icon className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="mb-2 font-heading text-xl text-foreground">{step.title}</h3>
-              <p className="font-body text-sm font-light leading-relaxed text-muted-foreground">
-                {step.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <HowItWorksSection />
 
       <div className="amber-rule" />
+
 
       {/* Example Prompts */}
       <section id="examples" className="container py-24">
