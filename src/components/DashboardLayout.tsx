@@ -101,7 +101,7 @@ const DashboardLayout = () => {
       {/* Bottom section */}
       <div className="border-t border-border p-3 space-y-3">
         {/* Credits */}
-        <div className={`flex items-center gap-2 rounded-button px-3 py-2 ${collapsed && !isMobile ? "justify-center" : ""}`}>
+        <div data-tutorial="credit-balance" className={`flex items-center gap-2 rounded-button px-3 py-2 ${collapsed && !isMobile ? "justify-center" : ""}`}>
           <Coins className="h-4 w-4 shrink-0 text-primary" />
           {(!collapsed || isMobile) && (
             <span className="font-mono text-sm text-primary">
