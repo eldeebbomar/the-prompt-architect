@@ -304,6 +304,10 @@ const ProjectDetail = () => {
     }
   };
 
+  if (showPromptViewer && project) {
+    return <PromptViewer projectId={id!} projectName={project.name} />;
+  }
+
   return (
     <>
       <GenerationOverlay
