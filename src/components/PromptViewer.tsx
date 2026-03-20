@@ -120,7 +120,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
         onGoToViewer={() => setExportOpen(false)}
       />
 
-      {allCopied && <CopyConfetti />}
+      {allCopied && <CopyConfetti active={allCopied} />}
 
       <div className="flex h-[calc(100vh-64px)] flex-col">
         {/* Top header */}
