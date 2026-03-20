@@ -163,7 +163,7 @@ const ProjectDetail = () => {
             : {};
         await supabase
           .from("projects")
-          .update({ spec_data: { ...currentSpec, ...spec_data } })
+          .update({ spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as import("@/integrations/supabase/types").Json })
           .eq("id", id);
       }
 
