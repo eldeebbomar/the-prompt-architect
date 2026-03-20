@@ -210,7 +210,7 @@ const Examples = () => {
             <div className="space-y-3">
               {filteredPrompts.map((p, i) => (
                 <div
-                  key={i}
+                  key={`${p.cat}-${p.title}`}
                   className={`rounded-card border border-border p-4 transition-opacity ${i >= 3 ? "opacity-40 blur-[2px]" : ""}`}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
