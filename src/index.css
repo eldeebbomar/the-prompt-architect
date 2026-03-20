@@ -73,7 +73,7 @@
   }
 }
 
-/* Blueprint grid pattern */
+/* Blueprint grid pattern — hero only */
 .blueprint-grid {
   position: relative;
 }
@@ -81,7 +81,10 @@
 .blueprint-grid::before {
   content: '';
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
   background-image:
     linear-gradient(hsl(33 10% 9% / 0.6) 1px, transparent 1px),
     linear-gradient(90deg, hsl(33 10% 9% / 0.6) 1px, transparent 1px);
@@ -89,11 +92,18 @@
   animation: grid-pulse 8s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
 }
 
 .blueprint-grid > * {
   position: relative;
   z-index: 1;
+}
+
+/* Overflow guard */
+html {
+  overflow-x: hidden;
 }
 
 /* Prompt card inner glow */

@@ -35,7 +35,7 @@ const PromptCardStack = () => {
       <div className="absolute left-12 bottom-24 h-1.5 w-1.5 rounded-full bg-primary/20 animate-float" style={{ animationDelay: "1s" }} />
 
       {/* Card stack */}
-      <div className="relative w-full max-w-[340px]">
+      <div className="relative w-full max-w-[300px] sm:max-w-[340px]">
         {promptCards.map((card, i) => {
           const offsetY = i * 28;
           const rotate = i * 1.8;
