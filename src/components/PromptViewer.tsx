@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, RefreshCw, Download, List, GitBranch, FileText } from "lucide-react";
+import { Copy, Check, RefreshCw, Download, List, GitBranch, FileText, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,6 +12,7 @@ import {
 import { useGeneratedPrompts } from "@/hooks/use-generated-prompts";
 import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
 import ExportModal from "@/components/ExportModal";
+import KnowledgeBaseModal from "@/components/KnowledgeBaseModal";
 import PromptDetailPanel from "@/components/PromptDetailPanel";
 import CopyConfetti from "@/components/CopyConfetti";
 import LoopPromptHeader from "@/components/LoopPromptHeader";
@@ -19,6 +20,7 @@ import GenerateLoopPromptsCard from "@/components/GenerateLoopPromptsCard";
 import DependencyGraph from "@/components/DependencyGraph";
 import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
 
 const CATEGORY_COLORS: Record<string, string> = {
   INFRASTRUCTURE: "bg-primary",
