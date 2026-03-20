@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Send, PanelRightOpen } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
+import PromptViewer from "@/components/PromptViewer";
 
 interface OptimisticMessage {
   id: string;
@@ -50,6 +51,11 @@ const ProjectDetail = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationDone, setGenerationDone] = useState(false);
   const [promptCount, setPromptCount] = useState(0);
+
+  // Show prompt viewer when project is ready/completed and not generating
+  const showPromptViewer =
+    !isGenerating &&
+    (project?.status === "ready" || project?.status === "completed");
 
   // Merge real + optimistic messages
   const allMessages = (() => {
@@ -297,6 +303,10 @@ const ProjectDetail = () => {
       toast.error("Prompt generation failed. Please try again.");
     }
   };
+
+  if (showPromptViewer && project) {
+    return <PromptViewer projectId={id!} projectName={project.name} />;
+  }
 
   return (
     <>
