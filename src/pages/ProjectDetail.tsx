@@ -266,29 +266,24 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         throw invokeError;
       }
 
-      const { reply, phase, is_complete, spec_data } = invokeData as {
+      const { reply, phase, is_complete } = invokeData as {
         reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
       };
 
-      await supabase.from("conversations").insert({
-        project_id: id, role: "assistant", content: reply, phase: phase || "discovery",
-        metadata: spec_data ? ({ spec_data } as unknown as Json) : {},
-      });
-
-      if (spec_data && Object.keys(spec_data).length > 0) {
-        const currentSpec = typeof project.spec_data === "object" && project.spec_data !== null ? project.spec_data : {};
-        await supabase.from("projects").update({ spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as Json }).eq("id", id);
-      }
+      // Display reply optimistically
+      const tempAssistantId = `opt-assistant-${Date.now()}`;
+      setOptimisticMessages((prev) => [
+        ...prev,
+        { id: tempAssistantId, role: "assistant", content: reply, created_at: new Date().toISOString(), phase: phase || "discovery", project_id: id, metadata: {} },
+      ]);
 
       if (is_complete) {
-        await supabase.from("conversations").insert({ project_id: id, role: "system", content: "✓ Discovery complete. Let's review your project spec.", phase: "discovery" });
-        await supabase.from("projects").update({ status: "generating" }).eq("id", id);
         toast.success("Discovery complete! Review your spec in the sidebar.");
       }
 
+      // n8n saves assistant message, spec_data, status, and system messages — just refetch
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       queryClient.invalidateQueries({ queryKey: ["project", id] });
-      setOptimisticMessages([]);
     } catch {
       setIsTyping(false);
       toast.error("Something went wrong. Please try again.");
