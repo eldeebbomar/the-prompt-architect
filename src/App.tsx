@@ -44,6 +44,7 @@ const App = () => (
               <Route path="/dashboard/billing" element={<Dashboard />} />
               <Route path="/dashboard/settings" element={<Dashboard />} />
               <Route path="/project/:id" element={<ProjectDetail />} />
+              <Route path="/project/:id/revise" element={<ProjectRevision />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
