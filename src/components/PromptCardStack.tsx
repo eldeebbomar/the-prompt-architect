@@ -49,11 +49,10 @@ const PromptCardStack = () => {
       {/* Card stack */}
       <div className="relative w-full max-w-[260px] sm:max-w-[300px] lg:max-w-[340px]">
         {promptCards.map((card, i) => {
-          const offsetY = i * 32;
-          const rotate = i * 1.8;
+          const offsetY = i * 48;
+          const rotate = i * 1;
           const scale = 1 - i * 0.03;
           const zIndex = promptCards.length - i;
-          const contentOpacity = 1 - i * 0.15;
           const isVisible = visibleCards.includes(i);
 
           return (
@@ -71,29 +70,27 @@ const PromptCardStack = () => {
                 transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
               }}
             >
-              <div style={{ opacity: contentOpacity }}>
-                <span
-                  className="mb-2 inline-block rounded-sm px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-[0.1em]"
-                  style={{
-                    color: card.categoryColor,
-                    border: `1px solid ${card.categoryColor}`,
-                    background: "transparent",
-                  }}
-                >
-                  {card.category}
-                </span>
-                <h4 className="mb-1.5 font-heading text-base text-foreground">{card.title}</h4>
-                {i < 2 && (
-                  <p className="font-mono text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                    {card.preview}
-                  </p>
-                )}
-              </div>
+              <span
+                className="mb-2 inline-block rounded-sm px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-[0.1em]"
+                style={{
+                  color: card.categoryColor,
+                  border: `1px solid ${card.categoryColor}`,
+                  background: "transparent",
+                }}
+              >
+                {card.category}
+              </span>
+              <h4 className="mb-1.5 font-heading text-base text-foreground">{card.title}</h4>
+              {i === 0 && (
+                <p className="font-mono text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                  {card.preview}
+                </p>
+              )}
             </div>
           );
         })}
         {/* Spacer for container height */}
-        <div style={{ height: `${(promptCards.length - 1) * 32 + 140}px` }} />
+        <div style={{ height: `${(promptCards.length - 1) * 48 + 140}px` }} />
       </div>
     </div>
   );
