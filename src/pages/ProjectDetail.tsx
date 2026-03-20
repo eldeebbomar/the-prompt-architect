@@ -52,6 +52,11 @@ const ProjectDetail = () => {
   const [generationDone, setGenerationDone] = useState(false);
   const [promptCount, setPromptCount] = useState(0);
 
+  // Show prompt viewer when project is ready/completed and not generating
+  const showPromptViewer =
+    !isGenerating &&
+    (project?.status === "ready" || project?.status === "completed");
+
   // Merge real + optimistic messages
   const allMessages = (() => {
     const real = messages ?? [];
