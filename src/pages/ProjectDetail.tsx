@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Send, PanelRightOpen } from "lucide-react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { Send, PanelRightOpen, FolderOpen, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversations, useProject } from "@/hooks/use-conversations";
@@ -22,6 +22,57 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
 import PromptViewer from "@/components/PromptViewer";
 
+/* ──────── 404 card ──────── */
+const ProjectNotFound = () => (
+  <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+    <div className="max-w-sm rounded-card border border-border bg-card p-10 text-center">
+      <FolderOpen className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
+      <h2 className="font-heading text-xl text-foreground">Project not found</h2>
+      <p className="mt-2 font-body text-sm text-muted-foreground">
+        This project may have been deleted.
+      </p>
+      <Link to="/dashboard">
+        <Button variant="amber" className="mt-6">
+          Back to Dashboard
+        </Button>
+      </Link>
+    </div>
+  </div>
+);
+
+/* ──────── Generating view ──────── */
+const GeneratingView = ({ projectName }: { projectName: string }) => (
+  <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+    <div className="max-w-md text-center space-y-6">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+      <div>
+        <h2 className="font-heading text-2xl text-foreground">Generating your prompts…</h2>
+        <p className="mt-2 font-body text-sm text-muted-foreground">
+          Building a custom prompt blueprint for <span className="text-foreground">{projectName}</span>. This usually takes 15–30 seconds.
+        </p>
+      </div>
+      <div className="mx-auto max-w-xs space-y-2.5">
+        {[
+          "Analyzing your spec…",
+          "Building infrastructure prompts…",
+          "Creating feature prompts…",
+          "Generating backend prompts…",
+          "Adding polish & loop prompts…",
+        ].map((step, i) => (
+          <div key={step} className="flex items-center gap-2.5 font-body text-xs text-muted-foreground animate-fade-in" style={{ animationDelay: `${i * 3}s` }}>
+            <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse" />
+            {step}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+/* ──────── Discovery Chat ──────── */
+
 interface OptimisticMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -32,15 +83,14 @@ interface OptimisticMessage {
   metadata: Record<string, unknown>;
 }
 
-const ProjectDetail = () => {
-  const { id } = useParams<{ id: string }>();
+const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof useProject>["data"]> }) => {
+  const id = project.id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { session } = useAuth();
 
-  const { data: project, isLoading: projectLoading } = useProject(id);
   const { data: messages, isLoading: messagesLoading } = useConversations(id);
 
   const [input, setInput] = useState("");
@@ -52,12 +102,6 @@ const ProjectDetail = () => {
   const [generationDone, setGenerationDone] = useState(false);
   const [promptCount, setPromptCount] = useState(0);
 
-  // Show prompt viewer when project is ready/completed and not generating
-  const showPromptViewer =
-    !isGenerating &&
-    (project?.status === "ready" || project?.status === "completed");
-
-  // Merge real + optimistic messages
   const allMessages = (() => {
     const real = messages ?? [];
     const realIds = new Set(real.map((m) => m.id));
@@ -65,14 +109,12 @@ const ProjectDetail = () => {
     return [...real, ...extras];
   })();
 
-  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [allMessages, isTyping]);
 
-  // Derive current phase from messages
   const currentPhase = (() => {
     if (!allMessages.length) return 0;
     const systemMsgs = allMessages.filter((m) => m.role === "system");
@@ -87,103 +129,54 @@ const ProjectDetail = () => {
     return phase;
   })();
 
-  // Show chat input for discovery status OR when status is generating (user can still chat)
-  const showChatInput = project?.status === "discovery" || project?.status === "generating";
-
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || !id || sending) return;
+    if (!text || sending) return;
 
     setInput("");
     setSending(true);
-
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-    }
+    if (inputRef.current) inputRef.current.style.height = "auto";
 
     const tempId = `opt-${Date.now()}`;
-    const optimisticMsg: OptimisticMessage = {
-      id: tempId,
-      role: "user",
-      content: text,
-      created_at: new Date().toISOString(),
-      phase: "discovery",
-      project_id: id,
-      metadata: {},
-    };
-    setOptimisticMessages((prev) => [...prev, optimisticMsg]);
+    setOptimisticMessages((prev) => [
+      ...prev,
+      { id: tempId, role: "user", content: text, created_at: new Date().toISOString(), phase: "discovery", project_id: id, metadata: {} },
+    ]);
 
     try {
-      await supabase.from("conversations").insert({
-        project_id: id,
-        role: "user",
-        content: text,
-        phase: "discovery",
-      });
-
+      await supabase.from("conversations").insert({ project_id: id, role: "user", content: text, phase: "discovery" });
       setIsTyping(true);
 
-      const { data: invokeData, error: invokeError } = await supabase.functions.invoke(
-        "discovery-webhook",
-        { body: { project_id: id, message: text } }
-      );
+      const { data: invokeData, error: invokeError } = await supabase.functions.invoke("discovery-webhook", {
+        body: { project_id: id, message: text },
+      });
 
       setIsTyping(false);
 
       if (invokeError) {
-        const errorMessage = invokeError.message || "";
-        if (errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
-          toast.error("Session expired. Please sign in again.");
-          navigate("/login");
-          return;
-        }
-        if (errorMessage.includes("402") || errorMessage.includes("No credits")) {
-          toast.error("You need credits to continue. Purchase more to keep building.");
-          navigate("/pricing");
-          return;
-        }
+        const msg = invokeError.message || "";
+        if (msg.includes("401") || msg.includes("Unauthorized")) { toast.error("Session expired. Please sign in again."); navigate("/login"); return; }
+        if (msg.includes("402") || msg.includes("No credits")) { toast.error("You need credits to continue."); navigate("/pricing"); return; }
         throw invokeError;
       }
 
       const { reply, phase, is_complete, spec_data } = invokeData as {
-        reply: string;
-        phase: string;
-        is_complete: boolean;
-        spec_data?: Record<string, string | number | boolean | null>;
+        reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
       };
 
       await supabase.from("conversations").insert({
-        project_id: id,
-        role: "assistant",
-        content: reply,
-        phase: phase || "discovery",
+        project_id: id, role: "assistant", content: reply, phase: phase || "discovery",
         metadata: spec_data ? ({ spec_data } as unknown as Json) : {},
       });
 
       if (spec_data && Object.keys(spec_data).length > 0) {
-        const currentSpec =
-          typeof project?.spec_data === "object" && project.spec_data !== null
-            ? project.spec_data
-            : {};
-        await supabase
-          .from("projects")
-          .update({
-            spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as Json,
-          })
-          .eq("id", id);
+        const currentSpec = typeof project.spec_data === "object" && project.spec_data !== null ? project.spec_data : {};
+        await supabase.from("projects").update({ spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as Json }).eq("id", id);
       }
 
       if (is_complete) {
-        await supabase.from("conversations").insert({
-          project_id: id,
-          role: "system",
-          content: "✓ Discovery complete. Let's review your project spec.",
-          phase: "discovery",
-        });
-        await supabase
-          .from("projects")
-          .update({ status: "generating" })
-          .eq("id", id);
+        await supabase.from("conversations").insert({ project_id: id, role: "system", content: "✓ Discovery complete. Let's review your project spec.", phase: "discovery" });
+        await supabase.from("projects").update({ status: "generating" }).eq("id", id);
         toast.success("Discovery complete! Review your spec in the sidebar.");
       }
 
@@ -200,100 +193,46 @@ const ProjectDetail = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
   const handleEndDiscovery = async () => {
-    if (!id) return;
-    await supabase.from("conversations").insert({
-      project_id: id,
-      role: "system",
-      content: "✓ Discovery ended early. Review your project spec.",
-      phase: "discovery",
-    });
-    await supabase
-      .from("projects")
-      .update({ status: "generating" })
-      .eq("id", id);
+    await supabase.from("conversations").insert({ project_id: id, role: "system", content: "✓ Discovery ended early. Review your project spec.", phase: "discovery" });
+    await supabase.from("projects").update({ status: "generating" }).eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["project", id] });
     queryClient.invalidateQueries({ queryKey: ["conversations", id] });
     toast.info("Discovery ended. Review your spec and generate prompts.");
   };
 
   const handleGeneratePrompts = async () => {
-    if (!id || isGenerating) return;
-
+    if (isGenerating) return;
     setIsGenerating(true);
     setGenerationDone(false);
 
     try {
-      const { data: invokeData, error: invokeError } = await supabase.functions.invoke(
-        "generate-prompts",
-        { body: { project_id: id } }
-      );
-
+      const { data: invokeData, error: invokeError } = await supabase.functions.invoke("generate-prompts", { body: { project_id: id } });
       if (invokeError) throw invokeError;
 
       const { success, prompt_count, prompts } = invokeData as {
-        success: boolean;
-        prompt_count: number;
-        prompts: Array<{
-          category: string;
-          sequence_order: number;
-          title: string;
-          purpose: string;
-          prompt_text: string;
-          depends_on: number[];
-          is_loop: boolean;
-        }>;
+        success: boolean; prompt_count: number;
+        prompts: Array<{ category: string; sequence_order: number; title: string; purpose: string; prompt_text: string; depends_on: number[]; is_loop: boolean }>;
       };
-
-      if (!success || !prompts?.length) {
-        throw new Error("No prompts returned");
-      }
+      if (!success || !prompts?.length) throw new Error("No prompts returned");
 
       setPromptCount(prompt_count || prompts.length);
       setGenerationDone(true);
 
-      // Batch insert prompts
-      const promptRows = prompts.map((p) => ({
-        project_id: id,
-        category: p.category,
-        sequence_order: p.sequence_order,
-        title: p.title,
-        purpose: p.purpose,
-        prompt_text: p.prompt_text,
-        depends_on: p.depends_on || [],
-        is_loop: p.is_loop || false,
-      }));
+      const { error: insertError } = await supabase.from("generated_prompts").insert(
+        prompts.map((p) => ({ project_id: id, category: p.category, sequence_order: p.sequence_order, title: p.title, purpose: p.purpose, prompt_text: p.prompt_text, depends_on: p.depends_on || [], is_loop: p.is_loop || false }))
+      );
+      if (insertError) { toast.error("Failed to save prompts."); return; }
 
-      const { error: insertError } = await supabase
-        .from("generated_prompts")
-        .insert(promptRows);
-
-      if (insertError) {
-        console.error("Failed to insert prompts:", insertError);
-        toast.error("Failed to save prompts. Please try again.");
-        return;
-      }
-
-      // Update project status
-      await supabase
-        .from("projects")
-        .update({ status: "ready" })
-        .eq("id", id);
-
+      await supabase.from("projects").update({ status: "ready" }).eq("id", id);
       queryClient.invalidateQueries({ queryKey: ["project", id] });
 
-      // Brief pause to show done state, then navigate
       setTimeout(() => {
         setIsGenerating(false);
         setGenerationDone(false);
-        navigate(`/project/${id}`);
-        // Force a full refresh of project data
         queryClient.invalidateQueries({ queryKey: ["project", id] });
         queryClient.invalidateQueries({ queryKey: ["prompts", id] });
       }, 2000);
@@ -304,22 +243,11 @@ const ProjectDetail = () => {
     }
   };
 
-  if (showPromptViewer && project) {
-    return <PromptViewer projectId={id!} projectName={project.name} />;
-  }
-
   return (
     <>
-      <GenerationOverlay
-        visible={isGenerating}
-        done={generationDone}
-        promptCount={promptCount}
-      />
-
+      <GenerationOverlay visible={isGenerating} done={generationDone} promptCount={promptCount} />
       <div className="flex h-[calc(100vh-64px)] gap-0">
-        {/* Chat panel */}
         <div className="flex flex-1 flex-col min-w-0">
-          {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5">
             {messagesLoading ? (
               <div className="space-y-4">
@@ -331,22 +259,14 @@ const ProjectDetail = () => {
               </div>
             ) : !allMessages.length ? (
               <div className="flex h-full items-center justify-center">
-                <p className="font-body text-sm text-muted-foreground">
-                  Start your discovery conversation…
-                </p>
+                <p className="font-body text-sm text-muted-foreground">Start your discovery conversation…</p>
               </div>
             ) : (
               <>
                 {allMessages.map((msg) => {
-                  if (msg.role === "user") {
-                    return <UserMessage key={msg.id} content={msg.content} createdAt={msg.created_at} />;
-                  }
-                  if (msg.role === "assistant") {
-                    return <AssistantMessage key={msg.id} content={msg.content} createdAt={msg.created_at} />;
-                  }
-                  if (msg.role === "system") {
-                    return <SystemMessage key={msg.id} content={msg.content} />;
-                  }
+                  if (msg.role === "user") return <UserMessage key={msg.id} content={msg.content} createdAt={msg.created_at} />;
+                  if (msg.role === "assistant") return <AssistantMessage key={msg.id} content={msg.content} createdAt={msg.created_at} />;
+                  if (msg.role === "system") return <SystemMessage key={msg.id} content={msg.content} />;
                   return null;
                 })}
                 {isTyping && <TypingIndicator />}
@@ -354,76 +274,87 @@ const ProjectDetail = () => {
             )}
           </div>
 
-          {/* Input area — available during discovery AND after completion */}
-          {showChatInput && (
-            <div className="shrink-0 border-t border-border bg-card px-4 py-4 md:px-8">
-              <div className="flex items-end gap-3">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Describe your idea or answer the AI's question..."
-                  rows={1}
-                  disabled={sending}
-                  className="max-h-32 min-h-[44px] flex-1 resize-none rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-primary disabled:opacity-50"
-                  style={{ height: "auto", overflow: "hidden" }}
-                  onInput={(e) => {
-                    const t = e.currentTarget;
-                    t.style.height = "auto";
-                    t.style.height = Math.min(t.scrollHeight, 128) + "px";
-                  }}
-                />
-                <Button
-                  variant="amber"
-                  size="icon"
-                  onClick={handleSend}
-                  disabled={!input.trim() || sending}
-                  className="h-11 w-11 shrink-0 rounded-full"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-
-                {/* Mobile info toggle */}
-                <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
-                  <SheetTrigger asChild className="lg:hidden">
-                    <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground">
-                      <PanelRightOpen className="h-4 w-4" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-[300px] border-l-border bg-card p-0">
-                    <SheetHeader className="sr-only">
-                      <SheetTitle>Project Info</SheetTitle>
-                    </SheetHeader>
-                    <ProjectInfoSidebar
-                      project={project ?? null}
-                      currentPhase={currentPhase}
-                      loading={projectLoading}
-                      onEndDiscovery={handleEndDiscovery}
-                      onGeneratePrompts={handleGeneratePrompts}
-                      isGenerating={isGenerating}
-                    />
-                  </SheetContent>
-                </Sheet>
-              </div>
+          <div className="shrink-0 border-t border-border bg-card px-4 py-4 md:px-8">
+            <div className="flex items-end gap-3">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Describe your idea or answer the AI's question..."
+                rows={1}
+                disabled={sending}
+                className="max-h-32 min-h-[44px] flex-1 resize-none rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-primary disabled:opacity-50"
+                style={{ height: "auto", overflow: "hidden" }}
+                onInput={(e) => { const t = e.currentTarget; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 128) + "px"; }}
+              />
+              <Button variant="amber" size="icon" onClick={handleSend} disabled={!input.trim() || sending} className="h-11 w-11 shrink-0 rounded-full">
+                <Send className="h-4 w-4" />
+              </Button>
+              <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
+                <SheetTrigger asChild className="lg:hidden">
+                  <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground">
+                    <PanelRightOpen className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[300px] border-l-border bg-card p-0">
+                  <SheetHeader className="sr-only"><SheetTitle>Project Info</SheetTitle></SheetHeader>
+                  <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} />
+                </SheetContent>
+              </Sheet>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Desktop sidebar */}
         <aside className="hidden w-[320px] shrink-0 border-l border-border bg-card lg:block overflow-y-auto">
-          <ProjectInfoSidebar
-            project={project ?? null}
-            currentPhase={currentPhase}
-            loading={projectLoading}
-            onEndDiscovery={handleEndDiscovery}
-            onGeneratePrompts={handleGeneratePrompts}
-            isGenerating={isGenerating}
-          />
+          <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} />
         </aside>
       </div>
     </>
   );
+};
+
+/* ──────── Smart Router ──────── */
+
+const ProjectDetail = () => {
+  const { id } = useParams<{ id: string }>();
+  const { data: project, isLoading, error } = useProject(id, {
+    refetchInterval: undefined, // will be set dynamically below
+  });
+
+  // Poll when generating
+  const { data: polledProject } = useProject(id, {
+    refetchInterval: project?.status === "generating" ? 3000 : false,
+  });
+
+  const activeProject = polledProject ?? project;
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !activeProject) {
+    return <ProjectNotFound />;
+  }
+
+  switch (activeProject.status) {
+    case "discovery":
+      return <DiscoveryChat project={activeProject} />;
+    case "generating":
+      return <GeneratingView projectName={activeProject.name} />;
+    case "ready":
+      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} />;
+    case "completed":
+      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} />;
+    case "revising":
+      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} />;
+    default:
+      return <DiscoveryChat project={activeProject} />;
+  }
 };
 
 export default ProjectDetail;
