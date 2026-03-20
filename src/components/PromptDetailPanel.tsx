@@ -8,6 +8,7 @@ import {
   Pencil,
   X,
   Save,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import type { PromptData } from "@/hooks/use-prompt-export";
+import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 
 const CATEGORY_BADGE_CLASSES: Record<string, string> = {
   INFRASTRUCTURE: "bg-primary/15 text-primary",
@@ -154,14 +156,24 @@ const PromptDetailPanel = ({
             {prompt.category}
           </span>
           {prompt.is_loop && (
-            <span className="inline-flex items-center gap-1 rounded-button border border-primary/30 px-2 py-0.5 font-body text-[10px] text-primary">
-              <Sparkles className="h-3 w-3" />
-              Loop
+            <>
+              <span className="inline-flex items-center gap-1 rounded-button border border-primary/30 px-2 py-0.5 font-body text-[10px] text-primary">
+                <RefreshCw className="h-3 w-3" />
+                Loop
+              </span>
+              <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 font-body text-[10px] font-semibold text-primary">
+                Repeat {getRepeatCount(prompt.title, prompt.purpose)}x
+              </span>
+              <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-muted-foreground">
+                {getAuditTag(prompt.title)}
+              </span>
+            </>
+          )}
+          {!prompt.is_loop && (
+            <span className="font-body text-[10px] text-muted-foreground">
+              #{prompt.sequence_order}
             </span>
           )}
-          <span className="font-body text-[10px] text-muted-foreground">
-            #{prompt.sequence_order}
-          </span>
         </div>
 
         {/* Title */}
@@ -173,6 +185,21 @@ const PromptDetailPanel = ({
         <p className="font-body text-sm italic text-muted-foreground mb-4">
           {prompt.purpose}
         </p>
+
+        {/* Loop-specific recommendation */}
+        {prompt.is_loop && (
+          <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-primary" />
+              <span className="font-body text-sm font-medium text-foreground">
+                Run this prompt {getRepeatCount(prompt.title, prompt.purpose)} times
+              </span>
+            </div>
+            <p className="font-body text-xs text-muted-foreground">
+              Each run catches issues the previous one missed. Lovable fixes problems incrementally — running it multiple times ensures thorough coverage.
+            </p>
+          </div>
+        )}
 
         {/* Dependencies */}
         {dependencyPrompts.length > 0 && (
@@ -259,7 +286,7 @@ const PromptDetailPanel = ({
             ) : (
               <>
                 <Copy className="h-4 w-4" />
-                Copy Prompt
+                {prompt.is_loop ? "Copy for Lovable" : "Copy Prompt"}
               </>
             )}
           </Button>

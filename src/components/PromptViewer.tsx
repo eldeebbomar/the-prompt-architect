@@ -13,6 +13,9 @@ import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
 import ExportModal from "@/components/ExportModal";
 import PromptDetailPanel from "@/components/PromptDetailPanel";
 import CopyConfetti from "@/components/CopyConfetti";
+import LoopPromptHeader from "@/components/LoopPromptHeader";
+import GenerateLoopPromptsCard from "@/components/GenerateLoopPromptsCard";
+import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 import { toast } from "sonner";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -295,13 +298,71 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
               })}
             </div>
 
+            {/* Loop prompts header */}
+            {activeCategory === "LOOP" && (categoryCounts["LOOP"] || 0) > 0 && (
+              <LoopPromptHeader />
+            )}
+
+            {/* Generate loop prompts CTA if none exist */}
+            {activeCategory === "LOOP" && (categoryCounts["LOOP"] || 0) === 0 && (
+              <GenerateLoopPromptsCard projectId={projectId} />
+            )}
+
             <div className="divide-y divide-border">
               {filteredPrompts.map((prompt) => {
                 const isCopied = copiedSet.has(prompt.id);
                 const isSelected = selectedPrompt?.id === prompt.id;
+                const isLoop = prompt.is_loop;
                 const dotClass =
                   CATEGORY_COLORS[prompt.category.toUpperCase()] ||
                   "bg-muted-foreground";
+
+                if (isLoop) {
+                  const repeatCount = getRepeatCount(prompt.title, prompt.purpose);
+                  const auditTag = getAuditTag(prompt.title);
+                  return (
+                    <button
+                      key={prompt.id}
+                      onClick={() => handleSelectPrompt(prompt.id)}
+                      className={`flex w-full items-start gap-3 border-l-4 border-l-primary px-4 py-4 text-left transition-colors group ${
+                        isSelected ? "bg-primary/5" : "hover:bg-muted/20"
+                      }`}
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                        <RefreshCw className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-heading text-sm text-foreground truncate">
+                            {prompt.title}
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 font-body text-[10px] font-semibold text-primary">
+                            Repeat {repeatCount}x
+                          </span>
+                          <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-muted-foreground">
+                            {auditTag}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-body text-xs text-muted-foreground line-clamp-2">
+                          {prompt.purpose}
+                        </p>
+                      </div>
+                      {isCopied ? (
+                        <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))] mt-1" />
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyPrompt(prompt);
+                          }}
+                          className="shrink-0 rounded-button p-1.5 text-muted-foreground opacity-0 transition-all hover:text-primary group-hover:opacity-100 active:scale-[0.95] mt-1"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      )}
+                    </button>
+                  );
+                }
 
                 return (
                   <button
