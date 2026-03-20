@@ -1,0 +1,1 @@
+CREATE POLICY "prompts_insert_own" ON public.generated_prompts FOR INSERT TO authenticated WITH CHECK (owns_project(project_id));

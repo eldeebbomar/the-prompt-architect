@@ -243,7 +243,7 @@ const RevisionChangesPanel = ({
             <div className="px-4 py-3">
               <ExpandableCard
                 expandContent={
-                  <div className="rounded-lg border border-border bg-[hsl(var(--obsidian))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
+                  <div className="rounded-lg border border-border bg-[hsl(var(--surface-elevated))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
                     {np.prompt_text.slice(0, 500)}
                     {np.prompt_text.length > 500 && "…"}
                   </div>
