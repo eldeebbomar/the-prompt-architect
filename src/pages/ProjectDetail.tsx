@@ -460,7 +460,22 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         </DialogContent>
       </Dialog>
 
-      <div className="flex h-[calc(100vh-64px)] gap-0">
+      {/* Credits needed modal */}
+      <Dialog open={creditsModalOpen} onOpenChange={setCreditsModalOpen}>
+        <DialogContent className="max-w-sm border-border bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-lg text-foreground">Credits Needed</DialogTitle>
+            <DialogDescription className="font-body text-sm text-muted-foreground">
+              You need credits to continue. Purchase more to keep building.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" size="sm" onClick={() => setCreditsModalOpen(false)}>Cancel</Button>
+            <Button variant="amber" size="sm" onClick={() => navigate("/pricing")}>Buy Credits</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
         <div className="flex flex-1 flex-col min-w-0">
           {/* Chat header */}
           <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4 md:px-8">
