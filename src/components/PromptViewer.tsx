@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useGeneratedPrompts } from "@/hooks/use-generated-prompts";
 import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
 import ExportModal from "@/components/ExportModal";
-import { CopyConfetti } from "@/components/CopyConfetti";
+import CopyConfetti from "@/components/CopyConfetti";
 import { toast } from "sonner";
 
 const CATEGORY_COLORS: Record<string, string> = {
