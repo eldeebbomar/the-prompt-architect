@@ -151,6 +151,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
     return () => document.removeEventListener("keydown", handler);
   }, [filteredPrompts, selectedPromptId, selectedPrompt, handleCopyPrompt]);
 
+  if (isLoading) {
     return (
       <div className="flex h-[calc(100vh-64px)] gap-0">
         {/* Category sidebar skeleton */}
