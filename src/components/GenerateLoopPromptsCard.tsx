@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 interface GenerateLoopPromptsCardProps {
   projectId: string;
@@ -12,6 +14,7 @@ interface GenerateLoopPromptsCardProps {
 const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) => {
   const [generating, setGenerating] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -28,7 +31,12 @@ const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) =>
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (!handleWebhookError(error, navigate)) {
+          throw error;
+        }
+        return;
+      }
 
       // n8n saves loop prompts to generated_prompts — just refetch
       queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });

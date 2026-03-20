@@ -12,6 +12,7 @@ export interface PromptData {
   prompt_text: string;
   is_loop: boolean;
   depends_on?: number[];
+  repeat_count?: number | null;
 }
 
 export function usePromptExport(projectId: string, prompts: PromptData[], metadata?: Json) {

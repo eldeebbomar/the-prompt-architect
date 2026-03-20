@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Send, Check, ArrowLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 const MAX_FREE_REVISIONS = 2;
 
@@ -51,6 +52,16 @@ const ProjectRevision = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
   const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
+
+  const handleRateLimit = useCallback(() => {
+    setRateLimited(true);
+    setSending(true);
+    setTimeout(() => {
+      setRateLimited(false);
+      setSending(false);
+    }, 5000);
+  }, []);
 
   // Revision result for diff panel
   const [revisionResult, setRevisionResult] = useState<RevisionResult | null>(null);
@@ -114,7 +125,12 @@ const ProjectRevision = () => {
 
       setIsTyping(false);
 
-      if (invokeError) throw invokeError;
+      if (invokeError) {
+        if (!handleWebhookError(invokeError, navigate, { onRateLimit: handleRateLimit })) {
+          throw invokeError;
+        }
+        return;
+      }
 
       const { reply, changed_prompts, new_prompts, deleted_prompt_ids, success } =
         invokeData as {

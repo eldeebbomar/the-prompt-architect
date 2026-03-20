@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
 import PromptViewer from "@/components/PromptViewer";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 /* ──────── 404 card ──────── */
 const ProjectNotFound = () => (
@@ -124,6 +125,19 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   // Clear & restart dialog
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  // Credits modal
+  const [creditsModalOpen, setCreditsModalOpen] = useState(false);
+  // Rate limit cooldown
+  const [rateLimited, setRateLimited] = useState(false);
+
+  const handleRateLimit = useCallback(() => {
+    setRateLimited(true);
+    setSending(true);
+    setTimeout(() => {
+      setRateLimited(false);
+      setSending(false);
+    }, 5000);
+  }, []);
 
   const allMessages = useMemo(() => {
     const real = messages ?? [];
@@ -210,7 +224,9 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             setIsTyping(false);
 
             if (invokeError) {
-              toast.error("Failed to reach AI architect. Please try again.");
+              if (!handleWebhookError(invokeError, navigate, { setCreditsModalOpen, onRateLimit: handleRateLimit })) {
+                toast.error("Failed to reach AI architect. Please try again.");
+              }
               setSending(false);
               return;
             }
@@ -260,10 +276,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       setIsTyping(false);
 
       if (invokeError) {
-        const msg = invokeError.message || "";
-        if (msg.includes("401") || msg.includes("Unauthorized")) { toast.error("Session expired. Please sign in again."); navigate("/login"); return; }
-        if (msg.includes("402") || msg.includes("No credits")) { toast.error("You need credits to continue."); navigate("/pricing"); return; }
-        throw invokeError;
+        if (!handleWebhookError(invokeError, navigate, { setCreditsModalOpen, onRateLimit: handleRateLimit })) {
+          toast.error("Something went wrong. Please try again.");
+        }
+        return;
       }
 
       const { reply, phase, is_complete } = invokeData as {
@@ -392,7 +408,14 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
     try {
       const { data: invokeData, error: invokeError } = await supabase.functions.invoke("generate-prompts", { body: { project_id: id } });
-      if (invokeError) throw invokeError;
+      if (invokeError) {
+        if (!handleWebhookError(invokeError, navigate, { setCreditsModalOpen })) {
+          throw invokeError;
+        }
+        setIsGenerating(false);
+        setGenerationDone(false);
+        return;
+      }
 
       const { success, prompt_count, prompts } = invokeData as {
         success: boolean; prompt_count: number;
@@ -433,6 +456,22 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
           <div className="flex justify-end gap-3 mt-4">
             <Button variant="outline" size="sm" onClick={() => setClearDialogOpen(false)}>Cancel</Button>
             <Button variant="destructive" size="sm" onClick={handleClearRestart}>Clear & Restart</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credits needed modal */}
+      <Dialog open={creditsModalOpen} onOpenChange={setCreditsModalOpen}>
+        <DialogContent className="max-w-sm border-border bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-lg text-foreground">Credits Needed</DialogTitle>
+            <DialogDescription className="font-body text-sm text-muted-foreground">
+              You need credits to continue. Purchase more to keep building.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" size="sm" onClick={() => setCreditsModalOpen(false)}>Cancel</Button>
+            <Button variant="amber" size="sm" onClick={() => navigate("/pricing")}>Buy Credits</Button>
           </div>
         </DialogContent>
       </Dialog>
