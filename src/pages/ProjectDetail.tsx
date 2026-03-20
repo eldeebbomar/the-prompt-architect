@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Send, PanelRightOpen, FolderOpen, Loader2 } from "lucide-react";
+import { Send, PanelRightOpen, FolderOpen, Loader2, Settings2, Download, RotateCcw, ArrowDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversations, useProject } from "@/hooks/use-conversations";
@@ -17,6 +17,20 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
@@ -103,20 +117,57 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const [promptCount, setPromptCount] = useState(0);
   const autoSentRef = useRef(false);
 
-  const allMessages = (() => {
+  // Auto-scroll state
+  const [userScrolledUp, setUserScrolledUp] = useState(false);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
+  const prevMessageCount = useRef(0);
+
+  // Clear & restart dialog
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+
+  const allMessages = useMemo(() => {
     const real = messages ?? [];
     const realIds = new Set(real.map((m) => m.id));
     const extras = optimisticMessages.filter((m) => !realIds.has(m.id));
     return [...real, ...extras];
-  })();
+  }, [messages, optimisticMessages]);
+
+  // Auto-scroll logic
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
+    setHasNewMessage(false);
+    setUserScrolledUp(false);
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const atBottom = scrollHeight - scrollTop - clientHeight < 80;
+    setUserScrolledUp(!atBottom);
+    if (atBottom) setHasNewMessage(false);
+  }, []);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (allMessages.length > prevMessageCount.current) {
+      if (userScrolledUp) {
+        setHasNewMessage(true);
+      } else {
+        setTimeout(() => scrollToBottom(), 50);
+      }
     }
-  }, [allMessages, isTyping]);
+    prevMessageCount.current = allMessages.length;
+  }, [allMessages.length, userScrolledUp, scrollToBottom]);
 
-  const currentPhase = (() => {
+  // Also scroll when typing indicator appears
+  useEffect(() => {
+    if (isTyping && !userScrolledUp) {
+      setTimeout(() => scrollToBottom(), 50);
+    }
+  }, [isTyping, userScrolledUp, scrollToBottom]);
+
+  const currentPhase = useMemo(() => {
     if (!allMessages.length) return 0;
     const systemMsgs = allMessages.filter((m) => m.role === "system");
     const phaseKeywords = ["users", "features", "tech", "scope"];
@@ -128,7 +179,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       });
     });
     return phase;
-  })();
+  }, [allMessages]);
 
   // Auto-send project description as first message
   useEffect(() => {
@@ -136,7 +187,6 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     if (messages && messages.length === 0 && project.description) {
       autoSentRef.current = true;
       setInput(project.description);
-      // Delay to let state settle, then trigger send
       setTimeout(() => {
         const syntheticText = project.description!;
         setInput("");
@@ -191,13 +241,9 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     }
   }, [messages, messagesLoading, project.description, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const sendMessage = async (text: string) => {
     if (!text || sending) return;
-
-    setInput("");
     setSending(true);
-    if (inputRef.current) inputRef.current.style.height = "auto";
 
     const tempId = `opt-${Date.now()}`;
     setOptimisticMessages((prev) => [
@@ -254,8 +300,76 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     }
   };
 
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
+    await sendMessage(text);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  // Edit message: delete subsequent messages and re-send
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    const sorted = [...(messages ?? [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const idx = sorted.findIndex((m) => m.id === messageId);
+    if (idx === -1) return;
+
+    // Delete this message and all subsequent
+    const toDelete = sorted.slice(idx).map((m) => m.id);
+    for (const delId of toDelete) {
+      await supabase.from("conversations").delete().eq("id", delId);
+    }
+    queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+
+    // Re-send with edited content
+    await sendMessage(newContent);
+  };
+
+  // Delete message
+  const handleDeleteMessage = async (messageId: string) => {
+    await supabase.from("conversations").delete().eq("id", messageId);
+    queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+    toast.success("Message deleted.");
+  };
+
+  // Export conversation as markdown
+  const handleExportConversation = () => {
+    const sorted = [...(messages ?? [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const lines = sorted.map((m) => {
+      const role = m.role === "user" ? "**You**" : m.role === "assistant" ? "**LovPlan Architect**" : "*System*";
+      const time = new Date(m.created_at).toLocaleString();
+      return `${role} — ${time}\n\n${m.content}\n\n---`;
+    });
+    const md = `# ${project.name} — Discovery Conversation\n\n${lines.join("\n\n")}`;
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project.name.replace(/\s+/g, "-").toLowerCase()}-conversation.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Conversation exported!");
+  };
+
+  // Clear & restart
+  const handleClearRestart = async () => {
+    setClearDialogOpen(false);
+    // Delete conversations
+    await supabase.from("conversations").delete().eq("project_id", id);
+    // Delete prompts
+    await supabase.from("generated_prompts").delete().eq("project_id", id);
+    // Reset status
+    await supabase.from("projects").update({ status: "discovery", spec_data: {} as Json }).eq("id", id);
+    queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+    queryClient.invalidateQueries({ queryKey: ["prompts", id] });
+    queryClient.invalidateQueries({ queryKey: ["project", id] });
+    setOptimisticMessages([]);
+    autoSentRef.current = false;
+    toast.success("Conversation cleared. Starting fresh.");
   };
 
   const handleEndDiscovery = async () => {
@@ -308,12 +422,51 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   return (
     <>
       <GenerationOverlay visible={isGenerating} done={generationDone} promptCount={promptCount} />
+
+      {/* Clear & Restart confirm dialog */}
+      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <DialogContent className="max-w-sm border-border bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-lg text-foreground">Clear & Restart?</DialogTitle>
+            <DialogDescription className="font-body text-sm text-muted-foreground">
+              This will delete the conversation and prompts. Your credit will NOT be refunded.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" size="sm" onClick={() => setClearDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" size="sm" onClick={handleClearRestart}>Clear & Restart</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex h-[calc(100vh-64px)] gap-0">
         <div className="flex flex-1 flex-col min-w-0">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5">
+          {/* Chat header */}
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4 md:px-8">
+            <h2 className="font-heading text-sm text-foreground truncate">{project.name}</h2>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors" aria-label="Chat options">
+                  <Settings2 className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuItem onClick={handleExportConversation}>
+                  <Download className="mr-2 h-3.5 w-3.5" /> Export Conversation
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setClearDialogOpen(true)} className="text-destructive focus:text-destructive">
+                  <RotateCcw className="mr-2 h-3.5 w-3.5" /> Clear & Restart
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Messages */}
+          <div ref={scrollRef} onScroll={handleScroll} className="relative flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5">
             {messagesLoading ? (
               <div className="space-y-4">
-              {[0, 1, 2].map((i) => (
+                {[0, 1, 2].map((i) => (
                   <div key={i} className={`flex ${i % 2 ? "justify-end" : "justify-start"}`}>
                     <div className={`space-y-2 ${i % 2 ? "w-[55%]" : "w-[65%]"}`}>
                       <Skeleton className={`h-3 w-20 rounded ${i % 2 ? "ml-auto" : ""}`} />
@@ -336,7 +489,16 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             ) : (
               <>
                 {allMessages.map((msg) => {
-                  if (msg.role === "user") return <UserMessage key={msg.id} content={msg.content} createdAt={msg.created_at} />;
+                  if (msg.role === "user") return (
+                    <UserMessage
+                      key={msg.id}
+                      content={msg.content}
+                      createdAt={msg.created_at}
+                      messageId={msg.id}
+                      onEdit={handleEditMessage}
+                      onDelete={handleDeleteMessage}
+                    />
+                  );
                   if (msg.role === "assistant") return <AssistantMessage key={msg.id} content={msg.content} createdAt={msg.created_at} />;
                   if (msg.role === "system") return <SystemMessage key={msg.id} content={msg.content} />;
                   return null;
@@ -344,8 +506,19 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                 {isTyping && <TypingIndicator />}
               </>
             )}
+
+            {/* New message pill */}
+            {hasNewMessage && (
+              <button
+                onClick={scrollToBottom}
+                className="sticky bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full border border-primary/50 bg-card px-4 py-2 font-body text-xs font-medium text-primary shadow-lg transition-all duration-200 hover:bg-primary hover:text-primary-foreground animate-fade-in"
+              >
+                New message <ArrowDown className="h-3 w-3" />
+              </button>
+            )}
           </div>
 
+          {/* Chat input */}
           <div className="shrink-0 border-t border-border bg-card px-4 py-4 md:px-8">
             <div className="flex items-end gap-3">
               <textarea
@@ -360,12 +533,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                 style={{ height: "auto", overflow: "hidden" }}
                 onInput={(e) => { const t = e.currentTarget; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 128) + "px"; }}
               />
-              <Button variant="amber" size="icon" onClick={handleSend} disabled={!input.trim() || sending} className="h-11 w-11 shrink-0 rounded-full">
+              <Button variant="amber" size="icon" onClick={handleSend} disabled={!input.trim() || sending} className="h-11 w-11 shrink-0 rounded-full" aria-label="Send message">
                 <Send className="h-4 w-4" />
               </Button>
               <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
                 <SheetTrigger asChild className="lg:hidden">
-                  <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground">
+                  <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground" aria-label="Project info">
                     <PanelRightOpen className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
@@ -396,7 +569,6 @@ const ProjectDetail = () => {
     refetchInterval: isGeneratingStatus ? 3000 : false,
   });
 
-  // Track generating status for polling
   useEffect(() => {
     setIsGeneratingStatus(activeProject?.status === "generating");
   }, [activeProject?.status]);
@@ -419,9 +591,7 @@ const ProjectDetail = () => {
     case "generating":
       return <GeneratingView projectName={activeProject.name} />;
     case "ready":
-      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} />;
     case "completed":
-      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} />;
     case "revising":
       return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} />;
     default:
