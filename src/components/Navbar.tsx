@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, Coins, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sheet,
   SheetContent,
@@ -10,7 +11,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-const navLinks = [
+const publicLinks = [
   { label: "How it Works", href: "/#how-it-works" },
   { label: "Pricing", href: "/pricing" },
   { label: "Examples", href: "/#examples" },
@@ -18,37 +19,74 @@ const navLinks = [
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
-  const location = useLocation();
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-[hsl(var(--nav-border))] bg-[hsl(var(--nav-bg))] backdrop-blur-sm">
       <div className="container flex h-full items-center justify-between">
-        {/* Logo */}
         <Link to="/" className="font-heading text-xl tracking-[0.05em] text-primary">
           LovPlan
         </Link>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-8 md:flex">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              to={link.href}
-              className="font-body text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
-            >
-              {link.label}
-            </Link>
-          ))}
+          {!user &&
+            publicLinks.map((link) => (
+              <Link
+                key={link.href}
+                to={link.href}
+                className="font-body text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+              >
+                {link.label}
+              </Link>
+            ))}
+          {user && (
+            <>
+              <Link
+                to="/dashboard"
+                className="font-body text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/pricing"
+                className="font-body text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+              >
+                Pricing
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Desktop actions */}
         <div className="hidden items-center gap-4 md:flex">
-          <Link to="/login">
-            <Button variant="navLink" size="sm">Sign In</Button>
-          </Link>
-          <Link to="/signup">
-            <Button variant="amber" size="default">Start Building</Button>
-          </Link>
+          {user ? (
+            <>
+              <div className="flex items-center gap-1.5 font-mono text-sm text-primary">
+                <Coins className="h-4 w-4" />
+                <span>{profile?.plan === "unlimited" ? "∞" : profile?.credits ?? 0}</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-1.5 text-muted-foreground">
+                <LogOut className="h-3.5 w-3.5" />
+                Sign Out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">
+                <Button variant="navLink" size="sm">Sign In</Button>
+              </Link>
+              <Link to="/signup">
+                <Button variant="amber" size="default">Start Building</Button>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -65,23 +103,29 @@ const Navbar = () => {
               </SheetTitle>
             </SheetHeader>
             <nav className="mt-8 flex flex-col gap-6">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  onClick={() => setOpen(false)}
-                  className="font-body text-base text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <div className="amber-rule my-2" />
-              <Link to="/login" onClick={() => setOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start">Sign In</Button>
-              </Link>
-              <Link to="/signup" onClick={() => setOpen(false)}>
-                <Button variant="amber" className="w-full">Start Building</Button>
-              </Link>
+              {user ? (
+                <>
+                  <div className="flex items-center gap-1.5 font-mono text-sm text-primary">
+                    <Coins className="h-4 w-4" />
+                    <span>{profile?.plan === "unlimited" ? "∞" : profile?.credits ?? 0} credits</span>
+                  </div>
+                  <Link to="/dashboard" onClick={() => setOpen(false)} className="font-body text-base text-muted-foreground transition-colors hover:text-foreground">Dashboard</Link>
+                  <Link to="/pricing" onClick={() => setOpen(false)} className="font-body text-base text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
+                  <div className="amber-rule my-2" />
+                  <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { handleSignOut(); setOpen(false); }}>
+                    <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {publicLinks.map((link) => (
+                    <Link key={link.href} to={link.href} onClick={() => setOpen(false)} className="font-body text-base text-muted-foreground transition-colors hover:text-foreground">{link.label}</Link>
+                  ))}
+                  <div className="amber-rule my-2" />
+                  <Link to="/login" onClick={() => setOpen(false)}><Button variant="ghost" className="w-full justify-start">Sign In</Button></Link>
+                  <Link to="/signup" onClick={() => setOpen(false)}><Button variant="amber" className="w-full">Start Building</Button></Link>
+                </>
+              )}
             </nav>
           </SheetContent>
         </Sheet>
