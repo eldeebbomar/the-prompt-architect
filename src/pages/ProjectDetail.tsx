@@ -408,7 +408,14 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
     try {
       const { data: invokeData, error: invokeError } = await supabase.functions.invoke("generate-prompts", { body: { project_id: id } });
-      if (invokeError) throw invokeError;
+      if (invokeError) {
+        if (!handleWebhookError(invokeError, navigate, { setCreditsModalOpen })) {
+          throw invokeError;
+        }
+        setIsGenerating(false);
+        setGenerationDone(false);
+        return;
+      }
 
       const { success, prompt_count, prompts } = invokeData as {
         success: boolean; prompt_count: number;
