@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import MyProjects from "./pages/MyProjects";
+import NewProject from "./pages/NewProject";
 import ProjectDetail from "./pages/ProjectDetail";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
@@ -37,7 +38,7 @@ const App = () => (
             {/* Dashboard layout with sidebar */}
             <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard/new" element={<Dashboard />} />
+              <Route path="/dashboard/new" element={<NewProject />} />
               <Route path="/dashboard/projects" element={<MyProjects />} />
               <Route path="/dashboard/billing" element={<Dashboard />} />
               <Route path="/dashboard/settings" element={<Dashboard />} />
