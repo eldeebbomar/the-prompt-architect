@@ -16,6 +16,9 @@ export interface CreditTransaction {
 export function useCreditTransactions() {
   return useInfiniteQuery({
     queryKey: ["credit-transactions"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    retry: 2,
     queryFn: async ({ pageParam = 0 }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");

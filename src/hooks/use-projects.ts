@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 export function useProjectCount() {
   return useQuery({
     queryKey: ["project-count"],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: 2,
     queryFn: async () => {
       const { count, error } = await supabase
         .from("projects")
@@ -17,6 +20,9 @@ export function useProjectCount() {
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
@@ -31,6 +37,9 @@ export function useProjects() {
 export function useRecentProjects(limit = 4) {
   return useQuery({
     queryKey: ["projects", "recent", limit],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
@@ -46,6 +55,9 @@ export function useRecentProjects(limit = 4) {
 export function usePromptCount() {
   return useQuery({
     queryKey: ["prompt-count"],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: 2,
     queryFn: async () => {
       const { count, error } = await supabase
         .from("generated_prompts")

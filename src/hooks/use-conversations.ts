@@ -5,6 +5,9 @@ export function useConversations(projectId: string | undefined, phase?: string) 
   return useQuery({
     queryKey: ["conversations", projectId, phase],
     enabled: !!projectId,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    retry: 2,
     queryFn: async () => {
       let query = supabase
         .from("conversations")
@@ -23,6 +26,9 @@ export function useProject(projectId: string | undefined, options?: { refetchInt
   return useQuery({
     queryKey: ["project", projectId],
     enabled: !!projectId,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: 2,
     refetchInterval: options?.refetchInterval,
     queryFn: async () => {
       const { data, error } = await supabase
