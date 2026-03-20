@@ -14,6 +14,7 @@ interface GenerateLoopPromptsCardProps {
 const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) => {
   const [generating, setGenerating] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const handleGenerate = async () => {
     setGenerating(true);
