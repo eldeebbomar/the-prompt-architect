@@ -593,7 +593,7 @@ const ProjectDetail = () => {
     case "ready":
     case "completed":
     case "revising":
-      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} />;
+      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} metadata={activeProject.metadata} />;
     default:
       return <DiscoveryChat project={activeProject} />;
   }

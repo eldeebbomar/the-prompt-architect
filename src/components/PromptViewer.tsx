@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, RefreshCw, Download, List, GitBranch, FileText } from "lucide-react";
+import { Copy, Check, RefreshCw, Download, List, GitBranch, FileText, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,6 +12,7 @@ import {
 import { useGeneratedPrompts } from "@/hooks/use-generated-prompts";
 import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
 import ExportModal from "@/components/ExportModal";
+import KnowledgeBaseModal from "@/components/KnowledgeBaseModal";
 import PromptDetailPanel from "@/components/PromptDetailPanel";
 import CopyConfetti from "@/components/CopyConfetti";
 import LoopPromptHeader from "@/components/LoopPromptHeader";
@@ -19,6 +20,7 @@ import GenerateLoopPromptsCard from "@/components/GenerateLoopPromptsCard";
 import DependencyGraph from "@/components/DependencyGraph";
 import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
 
 const CATEGORY_COLORS: Record<string, string> = {
   INFRASTRUCTURE: "bg-primary",
@@ -42,14 +44,17 @@ const CATEGORY_ORDER = [
 interface PromptViewerProps {
   projectId: string;
   projectName: string;
+  metadata: Json;
 }
 
-const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
+const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) => {
   const navigate = useNavigate();
   const { data: prompts, isLoading } = useGeneratedPrompts(projectId);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [kbOpen, setKbOpen] = useState(false);
+  const [localMetadata, setLocalMetadata] = useState<Json>(metadata);
   const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
@@ -76,7 +81,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
     markCopied,
     copyAll,
     downloadMarkdown,
-  } = usePromptExport(projectId, promptData);
+  } = usePromptExport(projectId, promptData, localMetadata);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: promptData.length };
@@ -228,6 +233,14 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
         onGoToViewer={() => setExportOpen(false)}
       />
 
+      <KnowledgeBaseModal
+        open={kbOpen}
+        onOpenChange={setKbOpen}
+        projectId={projectId}
+        metadata={localMetadata}
+        onMetadataUpdate={setLocalMetadata}
+      />
+
       {allCopied && <CopyConfetti active={allCopied} />}
 
       {/* Mobile detail sheet */}
@@ -289,6 +302,15 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
                   Graph
                 </button>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:inline-flex gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => setKbOpen(true)}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">📋 Knowledge Base</span>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
