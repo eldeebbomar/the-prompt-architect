@@ -29,7 +29,7 @@ const Index = () => {
   return (
     <div className="blueprint-grid">
       {/* Hero — Asymmetric editorial */}
-      <section className="container relative flex min-h-[calc(100vh-64px)] flex-col gap-12 py-16 lg:flex-row lg:items-center lg:gap-8 lg:py-0">
+      <section className="container relative flex min-h-[calc(100vh-64px)] flex-col gap-12 pt-20 pb-16 lg:flex-row lg:items-center lg:gap-8 lg:pt-0 lg:pb-0">
         {/* Left column — 55% */}
         <div className="flex flex-col justify-center lg:w-[55%]">
           {/* Pill badge */}
