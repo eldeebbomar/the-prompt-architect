@@ -1,12 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { CreditStats } from "@/types";
 
-export interface CreditStats {
-  credits_remaining: number;
-  total_purchased: number;
-  total_used: number;
-  plan: string;
-}
+export type { CreditStats };
 
 export function useCredits() {
   return useQuery({
