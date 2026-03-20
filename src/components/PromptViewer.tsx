@@ -16,6 +16,7 @@ import PromptDetailPanel from "@/components/PromptDetailPanel";
 import CopyConfetti from "@/components/CopyConfetti";
 import LoopPromptHeader from "@/components/LoopPromptHeader";
 import GenerateLoopPromptsCard from "@/components/GenerateLoopPromptsCard";
+import DependencyGraph from "@/components/DependencyGraph";
 import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 import { toast } from "sonner";
 
