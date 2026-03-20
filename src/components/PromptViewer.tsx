@@ -13,6 +13,9 @@ import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
 import ExportModal from "@/components/ExportModal";
 import PromptDetailPanel from "@/components/PromptDetailPanel";
 import CopyConfetti from "@/components/CopyConfetti";
+import LoopPromptHeader from "@/components/LoopPromptHeader";
+import GenerateLoopPromptsCard from "@/components/GenerateLoopPromptsCard";
+import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 import { toast } from "sonner";
 
 const CATEGORY_COLORS: Record<string, string> = {
