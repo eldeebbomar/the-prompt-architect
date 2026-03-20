@@ -222,7 +222,7 @@ const PromptDetailPanel = ({
         )}
 
         {/* Prompt text block */}
-        <div className="rounded-lg border border-[#3D3830] bg-[#1E1C17] overflow-hidden">
+        <div className="rounded-lg border border-border bg-[#1A1815] overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#3D3830] px-4 py-2">
             <span className="font-body text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Prompt
