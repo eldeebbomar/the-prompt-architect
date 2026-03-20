@@ -206,7 +206,7 @@ const RevisionChangesPanel = ({
                       newText={cp.prompt_text}
                     />
                   ) : (
-                    <div className="rounded-lg border border-border bg-[hsl(var(--obsidian))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
+                    <div className="rounded-lg border border-border bg-[hsl(var(--surface-elevated))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
                       {cp.prompt_text.slice(0, 500)}
                       {cp.prompt_text.length > 500 && "…"}
                     </div>
