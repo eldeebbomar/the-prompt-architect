@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Plus, Coins, FolderOpen, FileText, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
-import { useRecentProjects, usePromptCount } from "@/hooks/use-projects";
+import { useRecentProjects, useProjectCount, usePromptCount } from "@/hooks/use-projects";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 
