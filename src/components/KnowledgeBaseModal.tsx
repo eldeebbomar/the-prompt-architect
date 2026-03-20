@@ -72,19 +72,13 @@ const KnowledgeBaseModal = ({
         throw new Error("Failed to generate knowledge base");
       }
 
+      // n8n saves to projects.metadata — just update UI optimistically and refetch
       const newMetadata = {
         ...(typeof metadata === "object" && metadata && !Array.isArray(metadata)
           ? metadata
           : {}),
         knowledge_base: result.knowledge_base,
       } as Json;
-
-      const { error } = await supabase
-        .from("projects")
-        .update({ metadata: newMetadata })
-        .eq("id", projectId);
-
-      if (error) throw error;
 
       onMetadataUpdate(newMetadata);
       toast.success("Knowledge base generated!");

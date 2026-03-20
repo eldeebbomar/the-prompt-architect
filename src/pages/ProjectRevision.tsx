@@ -145,88 +145,26 @@ const ProjectRevision = () => {
 
       if (!success) throw new Error("Revision failed");
 
-      // Insert assistant reply
-      await supabase.from("conversations").insert({
-        project_id: id,
-        role: "assistant",
-        content: reply,
-        phase: "revision",
-      });
+      // n8n saves assistant reply, prompt changes, and status — just refetch
 
-      // Snapshot current state for undo
+      // Build old text lookup for diff display
       const currentPrompts = prompts ?? [];
-      const snapshot: PromptSnapshot[] = currentPrompts.map((p) => ({
-        id: p.id,
-        title: p.title,
-        prompt_text: p.prompt_text,
-        purpose: p.purpose,
-        category: p.category,
-        sequence_order: p.sequence_order,
-        depends_on: p.depends_on,
-        is_loop: p.is_loop,
-      }));
-      setPreRevisionSnapshot(snapshot);
-
-      // Build old text lookup for diff
       const oldLookup = new Map(currentPrompts.map((p) => [p.id, p]));
 
-      // Apply changes
-      const updatedIds = new Set<string>();
-
+      // Attach old data for diff if webhook didn't provide it
       if (changed_prompts?.length) {
         for (const cp of changed_prompts) {
           const old = oldLookup.get(cp.id);
-          // Attach old data for diff if webhook didn't provide it
           if (!cp.old_prompt_text && old) {
             cp.old_prompt_text = old.prompt_text;
           }
           if (!cp.old_title && old) {
             cp.old_title = old.title;
           }
-
-          await supabase
-            .from("generated_prompts")
-            .update({
-              title: cp.title,
-              prompt_text: cp.prompt_text,
-              purpose: cp.purpose,
-              category: cp.category,
-              version: (old?.version ?? 1) + 1,
-            })
-            .eq("id", cp.id);
-          updatedIds.add(cp.id);
         }
       }
 
-      let insertedIds: string[] = [];
-      if (new_prompts?.length) {
-        const rows = new_prompts.map((p) => ({
-          project_id: id,
-          category: p.category,
-          sequence_order: p.sequence_order,
-          title: p.title,
-          purpose: p.purpose,
-          prompt_text: p.prompt_text,
-          depends_on: p.depends_on || [],
-          is_loop: p.is_loop || false,
-        }));
-        const { data: inserted } = await supabase
-          .from("generated_prompts")
-          .insert(rows)
-          .select("id");
-        insertedIds = (inserted ?? []).map((r) => r.id);
-      }
-      setNewlyInsertedIds(insertedIds);
-
-      if (deleted_prompt_ids?.length) {
-        await supabase
-          .from("generated_prompts")
-          .delete()
-          .in("id", deleted_prompt_ids);
-      }
-
-      await supabase.from("projects").update({ status: "ready" }).eq("id", id);
-
+      const updatedIds = new Set<string>((changed_prompts ?? []).map((cp) => cp.id));
       setChangedIds((prev) => {
         const next = new Set(prev);
         updatedIds.forEach((uid) => next.add(uid));
@@ -239,7 +177,7 @@ const ProjectRevision = () => {
         return { id: did, title: old?.title ?? "Unknown prompt" };
       });
 
-      // Build revision result
+      // Build revision result for UI diff panel
       const totalPromptCount = currentPrompts.length;
       const unchangedCount =
         totalPromptCount -
@@ -270,6 +208,7 @@ const ProjectRevision = () => {
         (deleted_prompt_ids?.length ?? 0);
       toast.success(`${totalChanged} prompt${totalChanged !== 1 ? "s" : ""} updated.`);
 
+      // Refetch all data from Supabase (n8n already wrote it)
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       queryClient.invalidateQueries({ queryKey: ["prompts", id] });
       queryClient.invalidateQueries({ queryKey: ["project", id] });

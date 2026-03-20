@@ -398,19 +398,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         success: boolean; prompt_count: number;
         prompts: Array<{ category: string; sequence_order: number; title: string; purpose: string; prompt_text: string; depends_on: number[]; is_loop: boolean }>;
       };
-      if (!success || !prompts?.length) throw new Error("No prompts returned");
+      if (!success) throw new Error("No prompts returned");
 
-      setPromptCount(prompt_count || prompts.length);
+      setPromptCount(prompt_count || prompts?.length || 0);
       setGenerationDone(true);
 
-      const { error: insertError } = await supabase.from("generated_prompts").insert(
-        prompts.map((p) => ({ project_id: id, category: p.category, sequence_order: p.sequence_order, title: p.title, purpose: p.purpose, prompt_text: p.prompt_text, depends_on: p.depends_on || [], is_loop: p.is_loop || false }))
-      );
-      if (insertError) { toast.error("Failed to save prompts."); return; }
-
-      await supabase.from("projects").update({ status: "ready" }).eq("id", id);
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
-
+      // n8n saves prompts and updates project status — just refetch
       setTimeout(() => {
         setIsGenerating(false);
         setGenerationDone(false);
