@@ -14,7 +14,7 @@ import {
 const publicLinks = [
   { label: "How it Works", href: "/#how-it-works" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Examples", href: "/#examples" },
+  { label: "Examples", href: "/examples" },
 ];
 
 const Navbar = () => {

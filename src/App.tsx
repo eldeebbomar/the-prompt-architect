@@ -68,6 +68,7 @@ const App = () => (
                     <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
                     <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
                     <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/examples" element={<Examples />} />
                   </Route>
 
                   {/* Dashboard layout with sidebar */}
