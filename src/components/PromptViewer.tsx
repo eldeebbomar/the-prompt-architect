@@ -116,7 +116,41 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
     }
   }, []);
 
-  if (isLoading) {
+  // Keyboard shortcuts for prompt viewer
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't intercept when typing in inputs
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const currentIdx = filteredPrompts.findIndex((p) => p.id === (selectedPromptId ?? filteredPrompts[0]?.id));
+        const nextIdx = e.key === "ArrowDown"
+          ? Math.min(currentIdx + 1, filteredPrompts.length - 1)
+          : Math.max(currentIdx - 1, 0);
+        if (filteredPrompts[nextIdx]) {
+          setSelectedPromptId(filteredPrompts[nextIdx].id);
+        }
+      }
+
+      if (e.key === "Enter" && selectedPromptId) {
+        if (window.innerWidth < 1024) setMobileDetailOpen(true);
+      }
+
+      if (e.key === "c" && !e.metaKey && !e.ctrlKey && selectedPrompt) {
+        handleCopyPrompt(selectedPrompt);
+      }
+
+      if (e.key === "Escape") {
+        setMobileDetailOpen(false);
+        setSelectedPromptId(null);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [filteredPrompts, selectedPromptId, selectedPrompt, handleCopyPrompt]);
+
     return (
       <div className="flex h-[calc(100vh-64px)] gap-0">
         {/* Category sidebar skeleton */}
