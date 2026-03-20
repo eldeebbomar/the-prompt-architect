@@ -16,6 +16,7 @@ import NewProject from "./pages/NewProject";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectRevision from "./pages/ProjectRevision";
 import Pricing from "./pages/Pricing";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
