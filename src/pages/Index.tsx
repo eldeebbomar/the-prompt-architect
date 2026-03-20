@@ -121,7 +121,9 @@ const Index = () => {
         </div>
       </section>
 
-      <div className="amber-rule" />
+      {/* Problem / Solution */}
+      <ProblemSection />
+
 
       {/* How it Works */}
       <section id="how-it-works" className="container py-24">
