@@ -1,0 +1,1 @@
+ALTER TABLE generated_prompts ADD COLUMN IF NOT EXISTS repeat_count integer;

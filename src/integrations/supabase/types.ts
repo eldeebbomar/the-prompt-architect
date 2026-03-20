@@ -110,6 +110,7 @@ export type Database = {
           project_id: string
           prompt_text: string
           purpose: string
+          repeat_count: number | null
           sequence_order: number
           title: string
           updated_at: string
@@ -124,6 +125,7 @@ export type Database = {
           project_id: string
           prompt_text: string
           purpose: string
+          repeat_count?: number | null
           sequence_order: number
           title: string
           updated_at?: string
@@ -138,6 +140,7 @@ export type Database = {
           project_id?: string
           prompt_text?: string
           purpose?: string
+          repeat_count?: number | null
           sequence_order?: number
           title?: string
           updated_at?: string
