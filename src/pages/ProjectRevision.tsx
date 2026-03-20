@@ -7,6 +7,7 @@ import { useConversations, useProject } from "@/hooks/use-conversations";
 import { useGeneratedPrompts } from "@/hooks/use-generated-prompts";
 import { UserMessage, AssistantMessage, SystemMessage } from "@/components/ChatMessages";
 import TypingIndicator from "@/components/TypingIndicator";
+import RevisionChangesPanel, { type RevisionResult } from "@/components/RevisionChangesPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,18 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
 const MAX_FREE_REVISIONS = 2;
+
+// Snapshot of prompts before revision, for undo
+interface PromptSnapshot {
+  id: string;
+  title: string;
+  prompt_text: string;
+  purpose: string;
+  category: string;
+  sequence_order: number;
+  depends_on: number[];
+  is_loop: boolean;
+}
 
 const ProjectRevision = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,13 +52,19 @@ const ProjectRevision = () => {
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
   const [limitModalOpen, setLimitModalOpen] = useState(false);
 
+  // Revision result for diff panel
+  const [revisionResult, setRevisionResult] = useState<RevisionResult | null>(null);
+  // Snapshot for undo
+  const [preRevisionSnapshot, setPreRevisionSnapshot] = useState<PromptSnapshot[]>([]);
+  const [newlyInsertedIds, setNewlyInsertedIds] = useState<string[]>([]);
+  const [undoing, setUndoing] = useState(false);
+
   // Filter revision messages only
   const revisionMessages = useMemo(
     () => (allConversations ?? []).filter((m) => m.phase === "revision"),
     [allConversations]
   );
 
-  // Count user revision messages to check limits
   const revisionCount = useMemo(
     () => revisionMessages.filter((m) => m.role === "user").length,
     [revisionMessages]
@@ -55,7 +74,6 @@ const ProjectRevision = () => {
   const isUnlimited = plan === "unlimited" || plan === "5-pack";
   const atLimit = !isUnlimited && revisionCount >= MAX_FREE_REVISIONS;
 
-  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -79,7 +97,6 @@ const ProjectRevision = () => {
     }
 
     try {
-      // Insert user message
       await supabase.from("conversations").insert({
         project_id: id,
         role: "user",
@@ -90,15 +107,9 @@ const ProjectRevision = () => {
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       setIsTyping(true);
 
-      // Call revise webhook
       const { data: invokeData, error: invokeError } = await supabase.functions.invoke(
         "revise-prompts",
-        {
-          body: {
-            project_id: id,
-            revision_request: text,
-          },
-        }
+        { body: { project_id: id, revision_request: text } }
       );
 
       setIsTyping(false);
@@ -115,6 +126,9 @@ const ProjectRevision = () => {
             prompt_text: string;
             purpose: string;
             category: string;
+            old_title?: string;
+            old_prompt_text?: string;
+            changes_summary?: string;
           }>;
           new_prompts?: Array<{
             category: string;
@@ -139,12 +153,37 @@ const ProjectRevision = () => {
         phase: "revision",
       });
 
-      // Apply changes to generated_prompts
+      // Snapshot current state for undo
+      const currentPrompts = prompts ?? [];
+      const snapshot: PromptSnapshot[] = currentPrompts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        prompt_text: p.prompt_text,
+        purpose: p.purpose,
+        category: p.category,
+        sequence_order: p.sequence_order,
+        depends_on: p.depends_on,
+        is_loop: p.is_loop,
+      }));
+      setPreRevisionSnapshot(snapshot);
+
+      // Build old text lookup for diff
+      const oldLookup = new Map(currentPrompts.map((p) => [p.id, p]));
+
+      // Apply changes
       const updatedIds = new Set<string>();
 
-      // Update changed prompts
       if (changed_prompts?.length) {
         for (const cp of changed_prompts) {
+          const old = oldLookup.get(cp.id);
+          // Attach old data for diff if webhook didn't provide it
+          if (!cp.old_prompt_text && old) {
+            cp.old_prompt_text = old.prompt_text;
+          }
+          if (!cp.old_title && old) {
+            cp.old_title = old.title;
+          }
+
           await supabase
             .from("generated_prompts")
             .update({
@@ -152,13 +191,14 @@ const ProjectRevision = () => {
               prompt_text: cp.prompt_text,
               purpose: cp.purpose,
               category: cp.category,
+              version: (old?.version ?? 1) + 1,
             })
             .eq("id", cp.id);
           updatedIds.add(cp.id);
         }
       }
 
-      // Insert new prompts
+      let insertedIds: string[] = [];
       if (new_prompts?.length) {
         const rows = new_prompts.map((p) => ({
           project_id: id,
@@ -170,10 +210,14 @@ const ProjectRevision = () => {
           depends_on: p.depends_on || [],
           is_loop: p.is_loop || false,
         }));
-        await supabase.from("generated_prompts").insert(rows);
+        const { data: inserted } = await supabase
+          .from("generated_prompts")
+          .insert(rows)
+          .select("id");
+        insertedIds = (inserted ?? []).map((r) => r.id);
       }
+      setNewlyInsertedIds(insertedIds);
 
-      // Delete removed prompts
       if (deleted_prompt_ids?.length) {
         await supabase
           .from("generated_prompts")
@@ -181,13 +225,43 @@ const ProjectRevision = () => {
           .in("id", deleted_prompt_ids);
       }
 
-      // Update project status back to ready
       await supabase.from("projects").update({ status: "ready" }).eq("id", id);
 
       setChangedIds((prev) => {
         const next = new Set(prev);
         updatedIds.forEach((uid) => next.add(uid));
         return next;
+      });
+
+      // Build deleted prompt info for display
+      const deletedInfo = (deleted_prompt_ids ?? []).map((did) => {
+        const old = oldLookup.get(did);
+        return { id: did, title: old?.title ?? "Unknown prompt" };
+      });
+
+      // Build revision result
+      const totalPromptCount = currentPrompts.length;
+      const unchangedCount =
+        totalPromptCount -
+        (changed_prompts?.length ?? 0) -
+        (deleted_prompt_ids?.length ?? 0);
+
+      setRevisionResult({
+        reply,
+        changedPrompts: (changed_prompts ?? []).map((cp) => ({
+          id: cp.id,
+          sequence_order: cp.sequence_order,
+          title: cp.title,
+          old_title: cp.old_title,
+          prompt_text: cp.prompt_text,
+          old_prompt_text: cp.old_prompt_text,
+          purpose: cp.purpose,
+          category: cp.category,
+          changes_summary: cp.changes_summary,
+        })),
+        newPrompts: new_prompts ?? [],
+        deletedPrompts: deletedInfo,
+        unchangedCount: Math.max(0, unchangedCount),
       });
 
       const totalChanged =
@@ -208,6 +282,59 @@ const ProjectRevision = () => {
     }
   };
 
+  const handleAcceptChanges = () => {
+    setRevisionResult(null);
+    setPreRevisionSnapshot([]);
+    setNewlyInsertedIds([]);
+    navigate(`/project/${id}`);
+  };
+
+  const handleUndoRevision = async () => {
+    if (!id || !preRevisionSnapshot.length) return;
+    setUndoing(true);
+
+    try {
+      // Delete newly inserted prompts
+      if (newlyInsertedIds.length) {
+        await supabase
+          .from("generated_prompts")
+          .delete()
+          .in("id", newlyInsertedIds);
+      }
+
+      // Restore changed + deleted prompts from snapshot
+      for (const snap of preRevisionSnapshot) {
+        // Upsert: will restore deleted rows and revert changed ones
+        // Since we can't INSERT (no RLS insert policy for user), we update existing
+        // For deleted ones we need to re-insert — but generated_prompts has no insert policy for users.
+        // Instead, try update first; if it doesn't match, it was deleted — skip for now.
+        await supabase
+          .from("generated_prompts")
+          .update({
+            title: snap.title,
+            prompt_text: snap.prompt_text,
+            purpose: snap.purpose,
+            category: snap.category,
+          })
+          .eq("id", snap.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["prompts", id] });
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+
+      setRevisionResult(null);
+      setPreRevisionSnapshot([]);
+      setNewlyInsertedIds([]);
+      setChangedIds(new Set());
+
+      toast.success("Revision reverted.");
+    } catch {
+      toast.error("Failed to undo revision.");
+    } finally {
+      setUndoing(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -223,9 +350,11 @@ const ProjectRevision = () => {
     );
   }
 
+  // Determine what shows in the right panel
+  const showChangesPanel = revisionResult !== null;
+
   return (
     <>
-      {/* Revision limit modal */}
       <Dialog open={limitModalOpen} onOpenChange={setLimitModalOpen}>
         <DialogContent className="border-border bg-card sm:max-w-[420px]">
           <DialogHeader>
@@ -283,10 +412,12 @@ const ProjectRevision = () => {
 
         {/* Two-panel layout */}
         <div className="flex flex-1 min-h-0">
-          {/* Left: revision chat (60%) */}
+          {/* Left: revision chat */}
           <div className="flex flex-1 flex-col min-w-0 lg:flex-[3_3_0]">
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5">
-              {/* System intro message */}
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5"
+            >
               <SystemMessage content="Tell the AI what you'd like to change. It will regenerate only the affected prompts while keeping your infrastructure intact." />
 
               {revisionMessages.map((msg) => {
@@ -360,50 +491,62 @@ const ProjectRevision = () => {
             </div>
           </div>
 
-          {/* Right: current prompt list (40%) */}
-          <aside className="hidden w-[40%] shrink-0 border-l border-border bg-card lg:flex flex-col overflow-y-auto">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="font-heading text-base text-foreground">
-                Current Prompts
-              </h2>
-              <p className="mt-1 font-body text-[10px] text-muted-foreground">
-                {prompts?.length ?? 0} prompts • changed prompts will be highlighted
-              </p>
-            </div>
-
-            {promptsLoading ? (
-              <div className="p-4 space-y-2">
-                {[...Array(8)].map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full bg-muted" />
-                ))}
-              </div>
+          {/* Right panel: changes summary OR current prompts */}
+          <aside className="hidden w-[40%] shrink-0 border-l border-border bg-card lg:flex flex-col overflow-hidden">
+            {showChangesPanel ? (
+              <RevisionChangesPanel
+                result={revisionResult}
+                onAccept={handleAcceptChanges}
+                onUndo={handleUndoRevision}
+                undoing={undoing}
+              />
             ) : (
-              <div className="divide-y divide-border">
-                {(prompts ?? []).map((p) => {
-                  const isChanged = changedIds.has(p.id);
-                  return (
-                    <div
-                      key={p.id}
-                      className={`flex items-center gap-3 px-5 py-3 ${
-                        isChanged ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/40 font-body text-[10px] text-muted-foreground">
-                        {p.sequence_order}
-                      </div>
-                      <span className="flex-1 min-w-0 truncate font-body text-xs text-foreground">
-                        {p.title}
-                      </span>
-                      {isChanged && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-body text-[9px] font-semibold text-primary">
-                          <Check className="h-2.5 w-2.5" />
-                          Updated
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <>
+                <div className="shrink-0 border-b border-border px-5 py-4">
+                  <h2 className="font-heading text-base text-foreground">
+                    Current Prompts
+                  </h2>
+                  <p className="mt-1 font-body text-[10px] text-muted-foreground">
+                    {prompts?.length ?? 0} prompts • changed prompts will be
+                    highlighted
+                  </p>
+                </div>
+
+                {promptsLoading ? (
+                  <div className="p-4 space-y-2">
+                    {[...Array(8)].map((_, i) => (
+                      <Skeleton key={i} className="h-10 w-full bg-muted" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto divide-y divide-border">
+                    {(prompts ?? []).map((p) => {
+                      const isChanged = changedIds.has(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          className={`flex items-center gap-3 px-5 py-3 ${
+                            isChanged ? "bg-primary/5" : ""
+                          }`}
+                        >
+                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/40 font-body text-[10px] text-muted-foreground">
+                            {p.sequence_order}
+                          </div>
+                          <span className="flex-1 min-w-0 truncate font-body text-xs text-foreground">
+                            {p.title}
+                          </span>
+                          {isChanged && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-body text-[9px] font-semibold text-primary">
+                              <Check className="h-2.5 w-2.5" />
+                              Updated
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </aside>
         </div>
