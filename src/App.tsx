@@ -61,6 +61,7 @@ const App = () => (
               >
                 Skip to content
               </a>
+              <QuickSearch />
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Public layout with navbar */}
