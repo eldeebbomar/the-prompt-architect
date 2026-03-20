@@ -1,10 +1,13 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Coins, FolderOpen, FileText, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
 import { useRecentProjects, useProjectCount, usePromptCount } from "@/hooks/use-projects";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   discovery: { label: "Discovery", className: "border-primary/50 text-primary" },
@@ -16,11 +19,29 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
   const { data: stats, isLoading: statsLoading } = useCreditStats();
   const { data: projectCount, isLoading: projectsLoading } = useProjectCount();
   const { data: projects, isLoading: recentLoading } = useRecentProjects(4);
   const { data: promptCount, isLoading: promptsLoading } = usePromptCount();
+
+  // Handle payment success
+  useEffect(() => {
+    if (searchParams.get("payment") === "success") {
+      const plan = searchParams.get("plan") || "";
+      const planLabels: Record<string, string> = {
+        single: "1 credit",
+        pack: "5 credits",
+        unlimited: "Unlimited plan",
+      };
+      toast.success(`${planLabels[plan] || "Credits"} added to your account! 🎉`);
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, queryClient]);
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
 

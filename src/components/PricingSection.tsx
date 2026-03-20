@@ -1,7 +1,11 @@
-import { CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import ScrollReveal from "@/components/ScrollReveal";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const plans = [
   {
@@ -70,6 +74,41 @@ const plans = [
 ];
 
 const PricingSection = () => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const priceTypeMap: Record<string, string> = {
+    "Single": "single",
+    "5-Pack": "pack",
+    "Unlimited": "unlimited",
+  };
+
+  const handleCheckout = async (planName: string) => {
+    if (!user) {
+      window.location.href = "/signup";
+      return;
+    }
+
+    const priceType = priceTypeMap[planName];
+    if (!priceType) return;
+
+    setLoading(priceType);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+        body: { price_type: priceType },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error("Checkout error:", err);
+      toast.error("Failed to start checkout. Please try again.");
+    } finally {
+      setLoading(null);
+    }
+  };
   return (
     <section id="pricing" className="container py-24">
       {/* Header */}
@@ -131,14 +170,20 @@ const PricingSection = () => {
               </ul>
 
               {/* CTA */}
-              <Link to="/signup" className="mt-8 block">
+              <div className="mt-8">
                 <Button
                   variant={plan.ctaVariant}
                   className={`h-11 w-full text-sm font-medium ${plan.ctaClass}`}
+                  onClick={() => handleCheckout(plan.name)}
+                  disabled={loading === priceTypeMap[plan.name]}
                 >
-                  {plan.cta}
+                  {loading === priceTypeMap[plan.name] ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    plan.cta
+                  )}
                 </Button>
-              </Link>
+              </div>
             </div>
           </ScrollReveal>
         ))}
