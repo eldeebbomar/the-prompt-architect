@@ -170,11 +170,11 @@ const ProjectInfoSidebar = ({
             {phases.map((phase, i) => (
               <div key={phase.key} className="flex flex-col items-center gap-1.5">
                 <div
-                  className={`h-3 w-3 rounded-full transition-colors ${
+                  className={`h-3 w-3 rounded-full transition-all duration-300 ${
                     i < currentPhase
                       ? "bg-primary"
                       : i === currentPhase
-                      ? "bg-primary animate-pulse"
+                      ? "bg-primary phase-dot-active"
                       : "border border-muted-foreground/30 bg-transparent"
                   }`}
                 />

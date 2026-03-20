@@ -20,7 +20,7 @@ const ScrollReveal = ({ children, className = "", delay = 0 }: ScrollRevealProps
           observer.unobserve(el);
         }
       },
-      { threshold: 0.2 }
+      { threshold: 0.15 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -32,9 +32,9 @@ const ScrollReveal = ({ children, className = "", delay = 0 }: ScrollRevealProps
       className={className}
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(16px)",
+        transform: visible ? "translateY(0)" : "translateY(20px)",
         filter: visible ? "blur(0px)" : "blur(4px)",
-        transition: `opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, filter 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
+        transition: `opacity 600ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 600ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, filter 600ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
       }}
     >
       {children}
