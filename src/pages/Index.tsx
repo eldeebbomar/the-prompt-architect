@@ -10,6 +10,7 @@ import FeatureRevisionSection from "@/components/FeatureRevisionSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import PricingSection from "@/components/PricingSection";
 import FaqSection from "@/components/FaqSection";
+import CtaFooter from "@/components/CtaFooter";
 
 const examplePrompts = [
   "Set up Supabase auth with email/password and Google OAuth, including protected route wrappers",
@@ -175,32 +176,8 @@ const Index = () => {
 
       <div className="amber-rule" />
 
-      {/* CTA */}
-      <section className="container py-24">
-        <div className="mx-auto max-w-2xl text-center opacity-0 animate-fade-up">
-          <h2 className="font-heading text-3xl text-foreground md:text-4xl">
-            Ready to architect your next app?
-          </h2>
-          <p className="mt-4 font-body text-base font-light text-muted-foreground">
-            Stop guessing prompts. Get a structured blueprint that builds real products.
-          </p>
-          <Link to="/signup" className="mt-8 inline-block">
-            <Button variant="amber" size="lg" className="gap-2">
-              Get Started Free <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-8">
-        <div className="container flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <span className="font-heading text-sm tracking-[0.05em] text-primary">LovPlan</span>
-          <p className="font-body text-xs text-muted-foreground">
-            © 2026 LovPlan. Crafted for builders.
-          </p>
-        </div>
-      </footer>
+      {/* CTA + Footer */}
+      <CtaFooter />
     </div>
   );
 };
