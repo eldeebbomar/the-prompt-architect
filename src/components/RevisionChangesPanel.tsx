@@ -109,7 +109,7 @@ const SimpleDiff = ({
   }
 
   return (
-    <div className="space-y-1.5 rounded-lg border border-border bg-[hsl(var(--obsidian))] p-3 font-mono text-[11px] leading-relaxed max-h-[240px] overflow-y-auto">
+    <div className="space-y-1.5 rounded-lg border border-border bg-[hsl(var(--surface-elevated))] p-3 font-mono text-[11px] leading-relaxed max-h-[240px] overflow-y-auto">
       {removed.slice(0, 15).map((line, i) => (
         <div
           key={`r-${i}`}
