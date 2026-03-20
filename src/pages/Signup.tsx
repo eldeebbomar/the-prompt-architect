@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
@@ -11,7 +11,6 @@ const Signup = () => {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,9 +25,9 @@ const Signup = () => {
     });
     setLoading(false);
     if (error) {
-      toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
+      toast.error("Sign up failed", { description: error.message, duration: 6000 });
     } else {
-      toast({ title: "Check your email", description: "We sent a confirmation link." });
+      toast.info("Check your email — we sent a confirmation link.");
       navigate("/login");
     }
   };
