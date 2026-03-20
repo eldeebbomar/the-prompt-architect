@@ -27,7 +27,7 @@ const categories = [
   },
   {
     label: "FRONTEND",
-    color: "#6B8EBF",
+    color: "hsl(var(--blue-steel))",
     prompts: [
       { num: 5, title: "Dashboard Layout & Navigation" },
       { num: 6, title: "User Profile & Settings" },
@@ -146,7 +146,7 @@ const FeaturePromptsSection = () => {
                       cx={15 + i * 30}
                       cy={12}
                       r={4}
-                      fill={i < 2 ? "hsl(38 76% 56%)" : i < 4 ? "hsl(140 16% 55%)" : "#6B8EBF"}
+                      fill={i < 2 ? "hsl(38 76% 56%)" : i < 4 ? "hsl(140 16% 55%)" : "hsl(214 33% 58%)"}
                       opacity={0.7}
                     />
                   ))}

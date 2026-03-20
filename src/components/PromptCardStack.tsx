@@ -13,7 +13,7 @@ const promptCards = [
   },
   {
     category: "FRONTEND",
-    categoryColor: "#6B8EBF",
+    categoryColor: "hsl(var(--blue-steel))",
     title: "Dashboard Layout",
     preview: "Build a responsive dashboard with sidebar navigation and project cards...",
   },
@@ -46,7 +46,7 @@ const PromptCardStack = () => {
           return (
             <div
               key={card.category}
-              className="absolute left-0 right-0 rounded-card border border-border p-5 opacity-0 animate-slide-in-right"
+              className="absolute left-0 right-0 rounded-card border border-border p-5 animate-slide-in-right"
               style={{
                 background: `hsl(var(--prompt-card))`,
                 boxShadow: "inset 0 1px 1px hsl(38 76% 56% / 0.03), 0 4px 24px rgba(15, 14, 12, 0.6)",
