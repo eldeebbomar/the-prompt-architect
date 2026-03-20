@@ -152,7 +152,7 @@ const ProjectDetail = () => {
         role: "assistant",
         content: reply,
         phase: phase || "discovery",
-        metadata: spec_data ? { spec_data } : {},
+        metadata: spec_data ? ({ spec_data } as Record<string, unknown> as import("@/integrations/supabase/types").Json) : {},
       });
 
       // Update spec_data on project if returned
