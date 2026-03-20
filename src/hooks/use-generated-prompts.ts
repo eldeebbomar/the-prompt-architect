@@ -5,6 +5,7 @@ export function useGeneratedPrompts(projectId: string | undefined) {
   return useQuery({
     queryKey: ["prompts", projectId],
     enabled: !!projectId,
+    staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("generated_prompts")

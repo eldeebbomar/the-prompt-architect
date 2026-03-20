@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import SEO from "@/components/SEO";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   discovery: { label: "Discovery", className: "border-primary/50 text-primary" },
@@ -47,6 +48,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
+      <SEO title="Dashboard" />
       {/* Welcome */}
       <div>
         <h1 className="font-heading text-[28px] text-foreground">

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import SEO from "@/components/SEO";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -32,6 +33,7 @@ const Login = () => {
 
   return (
     <div className="blueprint-grid flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
+      <SEO title="Sign In" />
       <div className="w-full max-w-[420px] rounded-card border border-border bg-card p-12">
         {/* Logo */}
         <p className="mb-8 text-center font-heading text-2xl tracking-[0.05em] text-primary">
