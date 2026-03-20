@@ -363,18 +363,19 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   // Clear & restart
   const handleClearRestart = async () => {
     setClearDialogOpen(false);
-    // Delete conversations
-    await supabase.from("conversations").delete().eq("project_id", id);
-    // Delete prompts
-    await supabase.from("generated_prompts").delete().eq("project_id", id);
-    // Reset status
-    await supabase.from("projects").update({ status: "discovery", spec_data: {} as Json }).eq("id", id);
-    queryClient.invalidateQueries({ queryKey: ["conversations", id] });
-    queryClient.invalidateQueries({ queryKey: ["prompts", id] });
-    queryClient.invalidateQueries({ queryKey: ["project", id] });
-    setOptimisticMessages([]);
-    autoSentRef.current = false;
-    toast.success("Conversation cleared. Starting fresh.");
+    try {
+      await supabase.from("conversations").delete().eq("project_id", id);
+      await supabase.from("generated_prompts").delete().eq("project_id", id);
+      await supabase.from("projects").update({ status: "discovery", spec_data: {} as Json }).eq("id", id);
+      queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+      queryClient.invalidateQueries({ queryKey: ["prompts", id] });
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      setOptimisticMessages([]);
+      autoSentRef.current = false;
+      toast.success("Conversation cleared. Starting fresh.");
+    } catch {
+      toast.error("Failed to clear conversation.");
+    }
   };
 
   const handleEndDiscovery = async () => {
