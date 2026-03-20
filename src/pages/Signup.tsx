@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import SEO from "@/components/SEO";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
