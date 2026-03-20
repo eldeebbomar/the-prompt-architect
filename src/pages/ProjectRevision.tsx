@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 const MAX_FREE_REVISIONS = 2;
 
