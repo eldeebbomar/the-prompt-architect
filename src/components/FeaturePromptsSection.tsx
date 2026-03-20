@@ -27,7 +27,7 @@ const categories = [
   },
   {
     label: "FRONTEND",
-    color: "#6B8EBF",
+    color: "hsl(var(--blue-steel))",
     prompts: [
       { num: 5, title: "Dashboard Layout & Navigation" },
       { num: 6, title: "User Profile & Settings" },
