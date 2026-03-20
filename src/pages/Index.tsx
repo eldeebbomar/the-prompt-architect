@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Layers, Sparkles, Zap, CheckCircle2 } from "lucide-react";
+import { ArrowRight, PlayCircle, Layers, Sparkles, Zap, CheckCircle2 } from "lucide-react";
+import PromptCardStack from "@/components/PromptCardStack";
 
 const steps = [
   {
@@ -26,45 +27,96 @@ const examplePrompts = [
   "Build a data table component with sorting, filtering, pagination, and bulk actions",
 ];
 
+const avatars = [
+  "https://i.pravatar.cc/80?img=12",
+  "https://i.pravatar.cc/80?img=32",
+  "https://i.pravatar.cc/80?img=45",
+  "https://i.pravatar.cc/80?img=68",
+];
+
 const Index = () => {
   return (
     <div className="blueprint-grid">
-      {/* Hero */}
-      <section className="container relative py-24 md:py-32">
-        <div className="mx-auto max-w-3xl text-center">
-          <p
-            className="mb-4 font-body text-sm font-medium uppercase tracking-widest text-primary opacity-0 animate-fade-up"
+      {/* Hero — Asymmetric editorial */}
+      <section className="container relative flex min-h-[calc(100vh-64px)] flex-col gap-12 py-16 lg:flex-row lg:items-center lg:gap-8 lg:py-0">
+        {/* Left column — 55% */}
+        <div className="flex flex-col justify-center lg:w-[55%]">
+          {/* Pill badge */}
+          <div
+            className="mb-6 opacity-0 animate-fade-up"
             style={{ animationDelay: "0ms" }}
           >
-            The Architect's Prompt Engine
-          </p>
+            <span className="inline-block rounded-button border border-primary/50 px-3 py-1 font-body text-[12px] font-medium uppercase tracking-[0.1em] text-primary">
+              For Lovable Builders
+            </span>
+          </div>
+
+          {/* Headline */}
           <h1
-            className="font-heading text-4xl leading-[1.1] text-foreground opacity-0 animate-fade-up md:text-6xl"
-            style={{ animationDelay: "100ms", textWrap: "balance" }}
+            className="font-heading text-4xl leading-[1.08] text-foreground opacity-0 animate-fade-up md:text-[56px]"
+            style={{ animationDelay: "100ms" }}
           >
-            Build production apps with structured AI prompts
+            Stop prompting blindly.
+            <br />
+            Build with a <span className="text-primary">plan</span>.
           </h1>
+
+          {/* Subtitle */}
           <p
-            className="mx-auto mt-6 max-w-xl font-body text-lg font-light leading-relaxed text-muted-foreground opacity-0 animate-fade-up"
+            className="mt-6 max-w-[480px] font-body text-lg font-light leading-relaxed text-muted-foreground opacity-0 animate-fade-up"
             style={{ animationDelay: "200ms", textWrap: "pretty" }}
           >
-            LovPlan generates 50+ carefully sequenced prompts that guide Lovable to build complete, well-architected applications — not just prototypes.
+            LovPlan's AI architect interviews you about your idea, then generates 50+ structured, dependency-ordered prompts — so your Lovable app is built right the first time.
           </p>
+
+          {/* Buttons */}
           <div
-            className="mt-10 flex flex-col items-center gap-4 opacity-0 animate-fade-up sm:flex-row sm:justify-center"
+            className="mt-10 flex flex-col gap-3 opacity-0 animate-fade-up sm:flex-row sm:gap-4"
             style={{ animationDelay: "300ms" }}
           >
             <Link to="/signup">
               <Button variant="amber" size="lg" className="gap-2">
-                Start Building <ArrowRight className="h-4 w-4" />
+                Start Your First Project <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
             <Link to="/#how-it-works">
-              <Button variant="outline" size="lg">
+              <Button
+                variant="outline"
+                size="lg"
+                className="gap-2 border-muted-foreground/30 text-foreground"
+              >
+                <PlayCircle className="h-4 w-4" />
                 See How It Works
               </Button>
             </Link>
           </div>
+
+          {/* Social proof */}
+          <div
+            className="mt-10 flex items-center gap-3 opacity-0 animate-fade-up"
+            style={{ animationDelay: "400ms" }}
+          >
+            <div className="flex -space-x-2">
+              {avatars.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  alt=""
+                  className="h-8 w-8 rounded-full border-2 border-background object-cover"
+                />
+              ))}
+            </div>
+            <p className="font-body text-sm text-muted-foreground">
+              Trusted by <span className="font-medium text-foreground">200+</span> Lovable builders
+            </p>
+          </div>
+        </div>
+
+        {/* Right column — 45% */}
+        <div
+          className="flex items-center justify-center lg:w-[45%]"
+        >
+          <PromptCardStack />
         </div>
       </section>
 
@@ -74,7 +126,6 @@ const Index = () => {
       <section id="how-it-works" className="container py-24">
         <h2
           className="mb-16 text-center font-heading text-3xl text-foreground opacity-0 animate-fade-up md:text-4xl"
-          style={{ animationDelay: "0ms" }}
         >
           Three steps to a finished app
         </h2>
