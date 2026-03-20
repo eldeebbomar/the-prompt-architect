@@ -81,7 +81,7 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     markCopied,
     copyAll,
     downloadMarkdown,
-  } = usePromptExport(projectId, promptData);
+  } = usePromptExport(projectId, promptData, localMetadata);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: promptData.length };
