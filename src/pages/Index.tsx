@@ -170,6 +170,11 @@ const Index = () => {
 
       <div className="amber-rule" />
 
+      {/* FAQ */}
+      <FaqSection />
+
+      <div className="amber-rule" />
+
       {/* CTA */}
       <section className="container py-24">
         <div className="mx-auto max-w-2xl text-center opacity-0 animate-fade-up">
