@@ -42,6 +42,7 @@ const Signup = () => {
 
   return (
     <div className="blueprint-grid flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
+      <SEO title="Sign Up" />
       <div className="w-full max-w-[420px] rounded-card border border-border bg-card p-12">
         <p className="mb-8 text-center font-heading text-2xl tracking-[0.05em] text-primary">
           LovPlan
