@@ -127,3 +127,32 @@ html {
 .shadow-warm-lg {
   box-shadow: 0 8px 40px rgba(15, 14, 12, 0.7);
 }
+
+/* Warm shimmer skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(33 12% 12%) 0%,
+    hsl(33 10% 15%) 40%,
+    hsl(33 12% 12%) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Typing indicator bounce */
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* Auth loading bar */
+@keyframes loading-dot {
+  0% { left: 0; }
+  100% { left: calc(100% - 8px); }
+}

@@ -251,9 +251,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5">
             {messagesLoading ? (
               <div className="space-y-4">
-                {[0, 1, 2].map((i) => (
+              {[0, 1, 2].map((i) => (
                   <div key={i} className={`flex ${i % 2 ? "justify-end" : "justify-start"}`}>
-                    <Skeleton className={`h-16 rounded-card bg-muted ${i % 2 ? "w-[60%]" : "w-[70%]"}`} />
+                    <div className={`space-y-2 ${i % 2 ? "w-[55%]" : "w-[65%]"}`}>
+                      <Skeleton className={`h-3 w-20 rounded ${i % 2 ? "ml-auto" : ""}`} />
+                      <Skeleton className={`h-14 w-full ${i % 2 ? "rounded-[12px_12px_4px_12px]" : "rounded-[12px_12px_12px_4px]"}`} />
+                    </div>
                   </div>
                 ))}
               </div>
