@@ -476,6 +476,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         </DialogContent>
       </Dialog>
 
+      <div className="flex h-[calc(100vh-64px)] gap-0">
         <div className="flex flex-1 flex-col min-w-0">
           {/* Chat header */}
           <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4 md:px-8">
