@@ -1,5 +1,5 @@
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Toaster as Sonner, toast } from "sonner";
+import { Toaster as Sonner, toast as sonnerToast, type ExternalToast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
@@ -75,5 +75,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     />
   );
 };
+
+// Wrap toast.error to default to 6s duration
+const toast = Object.assign(sonnerToast, {
+  error: (message: string | React.ReactNode, data?: ExternalToast) =>
+    sonnerToast.error(message, { duration: 6000, ...data }),
+});
 
 export { Toaster, toast };
