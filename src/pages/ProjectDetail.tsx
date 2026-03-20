@@ -143,7 +143,7 @@ const ProjectDetail = () => {
         reply: string;
         phase: string;
         is_complete: boolean;
-        spec_data?: Record<string, unknown>;
+        spec_data?: Record<string, string | number | boolean | null>;
       };
 
       // Insert assistant message
