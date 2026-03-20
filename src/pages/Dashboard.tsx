@@ -48,6 +48,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
+      <SEO title="Dashboard" />
       {/* Welcome */}
       <div>
         <h1 className="font-heading text-[28px] text-foreground">
