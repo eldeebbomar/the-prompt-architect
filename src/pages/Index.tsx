@@ -5,24 +5,6 @@ import PromptCardStack from "@/components/PromptCardStack";
 import ProblemSection from "@/components/ProblemSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
 
-const steps = [
-  {
-    icon: Sparkles,
-    title: "Describe Your App",
-    description: "Tell us what you're building — SaaS, marketplace, dashboard, or anything else.",
-  },
-  {
-    icon: Layers,
-    title: "Get 50+ Structured Prompts",
-    description: "Receive a complete prompt sequence covering auth, database, UI, API, and deployment.",
-  },
-  {
-    icon: Zap,
-    title: "Build in Lovable",
-    description: "Paste prompts sequentially into Lovable and watch your production app come to life.",
-  },
-];
-
 const examplePrompts = [
   "Set up Supabase auth with email/password and Google OAuth, including protected route wrappers",
   "Create a responsive dashboard layout with sidebar navigation and breadcrumb header",
