@@ -219,6 +219,11 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {/* Keyboard shortcut hint */}
+      <p className="fixed bottom-4 right-4 hidden font-body text-xs text-muted-foreground/50 lg:block">
+        Press <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd> for quick search
+      </p>
     </div>
   );
 };
