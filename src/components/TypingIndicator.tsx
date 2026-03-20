@@ -14,8 +14,8 @@ const TypingIndicator = () => (
               key={i}
               className="h-2 w-2 rounded-full bg-primary"
               style={{
-                animation: "pulse 1.4s ease-in-out infinite",
-                animationDelay: `${i * 200}ms`,
+                animation: "typing-bounce 1.4s ease-in-out infinite",
+                animationDelay: `${i * 150}ms`,
               }}
             />
           ))}
