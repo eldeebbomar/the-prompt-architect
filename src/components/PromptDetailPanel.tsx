@@ -8,6 +8,7 @@ import {
   Pencil,
   X,
   Save,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import type { PromptData } from "@/hooks/use-prompt-export";
+import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 
 const CATEGORY_BADGE_CLASSES: Record<string, string> = {
   INFRASTRUCTURE: "bg-primary/15 text-primary",
