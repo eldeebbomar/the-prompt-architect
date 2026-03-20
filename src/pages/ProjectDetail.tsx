@@ -125,6 +125,19 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   // Clear & restart dialog
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  // Credits modal
+  const [creditsModalOpen, setCreditsModalOpen] = useState(false);
+  // Rate limit cooldown
+  const [rateLimited, setRateLimited] = useState(false);
+
+  const handleRateLimit = useCallback(() => {
+    setRateLimited(true);
+    setSending(true);
+    setTimeout(() => {
+      setRateLimited(false);
+      setSending(false);
+    }, 5000);
+  }, []);
 
   const allMessages = useMemo(() => {
     const real = messages ?? [];
