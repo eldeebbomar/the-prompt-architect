@@ -75,10 +75,25 @@
 
 /* Blueprint grid pattern */
 .blueprint-grid {
+  position: relative;
+}
+
+.blueprint-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background-image:
     linear-gradient(hsl(33 10% 9% / 0.6) 1px, transparent 1px),
     linear-gradient(90deg, hsl(33 10% 9% / 0.6) 1px, transparent 1px);
   background-size: 48px 48px;
+  animation: grid-pulse 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.blueprint-grid > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Prompt card inner glow */
