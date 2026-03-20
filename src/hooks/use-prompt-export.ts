@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import type { Json } from "@/integrations/supabase/types";
 
 const STORAGE_KEY_PREFIX = "lovplan_copied_prompts_";
 
