@@ -139,7 +139,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {projectsLoading ? (
+        {recentLoading ? (
           <div className="grid gap-4 sm:grid-cols-2">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-32 rounded-card bg-muted" />
