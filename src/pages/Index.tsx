@@ -126,6 +126,11 @@ const Index = () => {
 
       <div className="amber-rule" />
 
+      {/* Feature — Revision & Loop */}
+      <FeatureRevisionSection />
+
+      <div className="amber-rule" />
+
       {/* Example Prompts */}
       <section id="examples" className="container py-24">
         <h2
