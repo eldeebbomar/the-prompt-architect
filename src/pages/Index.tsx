@@ -10,6 +10,7 @@ import FeatureRevisionSection from "@/components/FeatureRevisionSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import PricingSection from "@/components/PricingSection";
 import FaqSection from "@/components/FaqSection";
+import CtaFooter from "@/components/CtaFooter";
 
 const examplePrompts = [
   "Set up Supabase auth with email/password and Google OAuth, including protected route wrappers",
