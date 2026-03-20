@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Copy, Check, RefreshCw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +44,7 @@ interface PromptViewerProps {
 }
 
 const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
+  const navigate = useNavigate();
   const { data: prompts, isLoading } = useGeneratedPrompts(projectId);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
@@ -180,6 +182,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
                 variant="outline"
                 size="sm"
                 className="hidden sm:inline-flex gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => navigate(`/project/${projectId}/revise`)}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 <span className="hidden md:inline">Revise Prompts</span>
