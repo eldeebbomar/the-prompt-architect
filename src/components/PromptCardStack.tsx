@@ -13,7 +13,7 @@ const promptCards = [
   },
   {
     category: "FRONTEND",
-    categoryColor: "#6B8EBF",
+    categoryColor: "hsl(var(--blue-steel))",
     title: "Dashboard Layout",
     preview: "Build a responsive dashboard with sidebar navigation and project cards...",
   },
