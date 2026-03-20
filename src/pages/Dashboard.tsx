@@ -19,11 +19,29 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
   const { data: stats, isLoading: statsLoading } = useCreditStats();
   const { data: projectCount, isLoading: projectsLoading } = useProjectCount();
   const { data: projects, isLoading: recentLoading } = useRecentProjects(4);
   const { data: promptCount, isLoading: promptsLoading } = usePromptCount();
+
+  // Handle payment success
+  useEffect(() => {
+    if (searchParams.get("payment") === "success") {
+      const plan = searchParams.get("plan") || "";
+      const planLabels: Record<string, string> = {
+        single: "1 credit",
+        pack: "5 credits",
+        unlimited: "Unlimited plan",
+      };
+      toast.success(`${planLabels[plan] || "Credits"} added to your account! 🎉`);
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, queryClient]);
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
 

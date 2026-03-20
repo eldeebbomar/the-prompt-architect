@@ -170,14 +170,20 @@ const PricingSection = () => {
               </ul>
 
               {/* CTA */}
-              <Link to="/signup" className="mt-8 block">
+              <div className="mt-8">
                 <Button
                   variant={plan.ctaVariant}
                   className={`h-11 w-full text-sm font-medium ${plan.ctaClass}`}
+                  onClick={() => handleCheckout(plan.name)}
+                  disabled={loading === priceTypeMap[plan.name]}
                 >
-                  {plan.cta}
+                  {loading === priceTypeMap[plan.name] ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    plan.cta
+                  )}
                 </Button>
-              </Link>
+              </div>
             </div>
           </ScrollReveal>
         ))}
