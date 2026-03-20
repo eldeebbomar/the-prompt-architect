@@ -62,6 +62,24 @@ export function usePromptExport(projectId: string, prompts: PromptData[], metada
 
     let md = `# LovPlan Prompt Blueprint\n\n`;
     md += `> ${prompts.length} prompts generated for this project\n\n`;
+
+    // Step 0: Knowledge Base
+    const kbText =
+      metadata &&
+      typeof metadata === "object" &&
+      !Array.isArray(metadata) &&
+      "knowledge_base" in metadata &&
+      typeof (metadata as Record<string, unknown>).knowledge_base === "string"
+        ? (metadata as Record<string, string>).knowledge_base
+        : "";
+
+    if (kbText) {
+      md += `## Step 0: Set Up Knowledge Base\n\n`;
+      md += `> **Before queuing any prompts**, paste the following into your Lovable project's Knowledge Base.\n`;
+      md += `> Go to **Project Settings → Knowledge** and paste this entire block.\n\n`;
+      md += `\`\`\`\n${kbText}\n\`\`\`\n\n---\n\n`;
+    }
+
     md += `## Table of Contents\n\n`;
     categories.forEach((cat) => {
       const count = prompts.filter((p) => p.category === cat).length;
