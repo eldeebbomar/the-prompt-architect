@@ -84,6 +84,7 @@ const DashboardLayout = () => {
               key={item.href}
               to={item.href}
               onClick={() => isMobile && setMobileOpen(false)}
+              {...(item.href === "/dashboard/new" ? { "data-tutorial": "new-project-nav" } : {})}
               className={`group flex items-center gap-3 rounded-button px-3 py-2.5 font-body text-sm transition-all duration-200 ${
                 active
                   ? "border-l-[3px] border-l-primary bg-[hsl(40_8%_10%)] text-primary"
@@ -100,7 +101,7 @@ const DashboardLayout = () => {
       {/* Bottom section */}
       <div className="border-t border-border p-3 space-y-3">
         {/* Credits */}
-        <div className={`flex items-center gap-2 rounded-button px-3 py-2 ${collapsed && !isMobile ? "justify-center" : ""}`}>
+        <div data-tutorial="credit-balance" className={`flex items-center gap-2 rounded-button px-3 py-2 ${collapsed && !isMobile ? "justify-center" : ""}`}>
           <Coins className="h-4 w-4 shrink-0 text-primary" />
           {(!collapsed || isMobile) && (
             <span className="font-mono text-sm text-primary">

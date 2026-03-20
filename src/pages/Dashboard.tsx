@@ -9,6 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import SEO from "@/components/SEO";
+import OnboardingTutorial from "@/components/OnboardingTutorial";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   discovery: { label: "Discovery", className: "border-primary/50 text-primary" },
@@ -49,7 +50,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-8">
       <SEO title="Dashboard" />
-      {/* Welcome */}
+      <OnboardingTutorial projectCount={projectCount} isLoading={projectsLoading} />
       <div>
         <h1 className="font-heading text-[28px] text-foreground">
           Welcome back{firstName ? `, ${firstName}` : ""}
@@ -136,6 +137,7 @@ const Dashboard = () => {
 
       {/* New project CTA */}
       <button
+        data-tutorial="new-project-cta"
         onClick={() => navigate("/dashboard/new")}
         className="group flex w-full flex-col items-center gap-3 rounded-card border-2 border-dashed border-primary/40 bg-card p-10 transition-all duration-300 hover:border-primary hover:scale-[1.01] active:scale-[0.99]"
       >
