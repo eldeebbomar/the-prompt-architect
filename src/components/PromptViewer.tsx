@@ -44,6 +44,7 @@ interface PromptViewerProps {
 }
 
 const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
+  const navigate = useNavigate();
   const { data: prompts, isLoading } = useGeneratedPrompts(projectId);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
