@@ -9,6 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import SEO from "@/components/SEO";
+import OnboardingTutorial from "@/components/OnboardingTutorial";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   discovery: { label: "Discovery", className: "border-primary/50 text-primary" },
