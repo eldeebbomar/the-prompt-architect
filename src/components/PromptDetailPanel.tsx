@@ -286,7 +286,7 @@ const PromptDetailPanel = ({
             ) : (
               <>
                 <Copy className="h-4 w-4" />
-                Copy Prompt
+                {prompt.is_loop ? "Copy for Lovable" : "Copy Prompt"}
               </>
             )}
           </Button>
