@@ -233,6 +233,14 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
         onGoToViewer={() => setExportOpen(false)}
       />
 
+      <KnowledgeBaseModal
+        open={kbOpen}
+        onOpenChange={setKbOpen}
+        projectId={projectId}
+        metadata={localMetadata}
+        onMetadataUpdate={setLocalMetadata}
+      />
+
       {allCopied && <CopyConfetti active={allCopied} />}
 
       {/* Mobile detail sheet */}
