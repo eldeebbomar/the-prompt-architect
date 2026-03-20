@@ -9,6 +9,7 @@ import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import DashboardLayout from "./components/DashboardLayout";
+import QuickSearch from "./components/QuickSearch";
 
 // Lazy-loaded routes
 const Index = lazy(() => import("./pages/Index"));
