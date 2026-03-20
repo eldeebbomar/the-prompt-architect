@@ -140,9 +140,9 @@ const DashboardLayout = () => {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar — visible at lg (1024px+) */}
       <aside
-        className={`hidden flex-col border-r border-border bg-card md:flex transition-[width] duration-300 ${
+        className={`hidden flex-col border-r border-border bg-card lg:flex transition-[width] duration-300 ${
           collapsed ? "w-[72px]" : "w-[260px]"
         }`}
       >
