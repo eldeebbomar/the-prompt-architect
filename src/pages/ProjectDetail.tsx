@@ -224,7 +224,9 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             setIsTyping(false);
 
             if (invokeError) {
-              toast.error("Failed to reach AI architect. Please try again.");
+              if (!handleWebhookError(invokeError, navigate, { setCreditsModalOpen, onRateLimit: handleRateLimit })) {
+                toast.error("Failed to reach AI architect. Please try again.");
+              }
               setSending(false);
               return;
             }
