@@ -462,7 +462,7 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
                     "bg-muted-foreground";
 
                   if (isLoop) {
-                    const repeatCount = getRepeatCount(prompt.title, prompt.purpose);
+                    const repeatCount = prompt.repeat_count ?? getRepeatCount(prompt.title, prompt.purpose);
                     const auditTag = getAuditTag(prompt.title);
                     return (
                       <button
@@ -480,7 +480,7 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
                             <span className="font-heading text-sm text-foreground truncate">
                               {prompt.title}
                             </span>
-                            <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 font-body text-[10px] font-semibold text-primary">
+                            <span className="inline-flex items-center rounded-full border border-primary px-2 py-0.5 font-body text-[10px] font-semibold text-primary">
                               Repeat {repeatCount}x
                             </span>
                             <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-muted-foreground">
