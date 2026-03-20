@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, PlayCircle, Layers, Sparkles, Zap, CheckCircle2 } from "lucide-react";
+import { ArrowRight, PlayCircle, CheckCircle2 } from "lucide-react";
 import PromptCardStack from "@/components/PromptCardStack";
 import ProblemSection from "@/components/ProblemSection";
+import HowItWorksSection from "@/components/HowItWorksSection";
 
 const steps = [
   {
