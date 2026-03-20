@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import MyProjects from "./pages/MyProjects";
 import NewProject from "./pages/NewProject";
 import ProjectDetail from "./pages/ProjectDetail";
+import ProjectRevision from "./pages/ProjectRevision";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
