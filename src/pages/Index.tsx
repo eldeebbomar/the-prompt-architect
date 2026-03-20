@@ -6,6 +6,7 @@ import ProblemSection from "@/components/ProblemSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
 import FeatureChatSection from "@/components/FeatureChatSection";
 import FeaturePromptsSection from "@/components/FeaturePromptsSection";
+import FeatureRevisionSection from "@/components/FeatureRevisionSection";
 
 const examplePrompts = [
   "Set up Supabase auth with email/password and Google OAuth, including protected route wrappers",
