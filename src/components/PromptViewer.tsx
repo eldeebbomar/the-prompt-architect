@@ -44,14 +44,17 @@ const CATEGORY_ORDER = [
 interface PromptViewerProps {
   projectId: string;
   projectName: string;
+  metadata: Json;
 }
 
-const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
+const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) => {
   const navigate = useNavigate();
   const { data: prompts, isLoading } = useGeneratedPrompts(projectId);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [kbOpen, setKbOpen] = useState(false);
+  const [localMetadata, setLocalMetadata] = useState<Json>(metadata);
   const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
