@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import MyProjects from "./pages/MyProjects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
@@ -37,7 +38,7 @@ const App = () => (
             <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dashboard/new" element={<Dashboard />} />
-              <Route path="/dashboard/projects" element={<Dashboard />} />
+              <Route path="/dashboard/projects" element={<MyProjects />} />
               <Route path="/dashboard/billing" element={<Dashboard />} />
               <Route path="/dashboard/settings" element={<Dashboard />} />
               <Route path="/project/:id" element={<ProjectDetail />} />
