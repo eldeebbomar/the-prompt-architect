@@ -26,11 +26,9 @@ const ExportModal = ({
   onDownloadMd,
   onGoToViewer,
 }: ExportModalProps) => {
-  const { toast } = useToast();
-
   const handleCopyAll = async () => {
     await onCopyAll();
-    toast({ title: `All ${promptCount} prompts copied!` });
+    toast.success(`All ${promptCount} prompts copied!`);
   };
 
   return (

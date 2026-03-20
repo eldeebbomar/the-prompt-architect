@@ -29,7 +29,7 @@ export function useProject(projectId: string | undefined, options?: { refetchInt
         .from("projects")
         .select("*")
         .eq("id", projectId!)
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
