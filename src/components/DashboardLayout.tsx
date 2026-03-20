@@ -140,9 +140,9 @@ const DashboardLayout = () => {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar — visible at lg (1024px+) */}
       <aside
-        className={`hidden flex-col border-r border-border bg-card md:flex transition-[width] duration-300 ${
+        className={`hidden flex-col border-r border-border bg-card lg:flex transition-[width] duration-300 ${
           collapsed ? "w-[72px]" : "w-[260px]"
         }`}
       >
@@ -152,12 +152,12 @@ const DashboardLayout = () => {
       {/* Main area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Top bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:px-8">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-4 lg:px-8">
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-              <SheetTrigger asChild className="md:hidden">
-                <Button variant="ghost" size="icon" className="shrink-0">
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
@@ -188,14 +188,14 @@ const DashboardLayout = () => {
                 Buy Credits
               </Button>
             </Link>
-            <div className="hidden h-9 w-9 items-center justify-center rounded-full bg-primary/15 font-body text-sm font-medium text-primary md:flex">
+            <div className="hidden h-9 w-9 items-center justify-center rounded-full bg-primary/15 font-body text-sm font-medium text-primary lg:flex">
               {profile?.full_name?.charAt(0)?.toUpperCase() || profile?.email?.charAt(0)?.toUpperCase() || "U"}
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-6 md:p-8">
+        <main className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
