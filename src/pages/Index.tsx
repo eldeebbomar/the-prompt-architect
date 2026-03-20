@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, PlayCircle, Layers, Sparkles, Zap, CheckCircle2 } from "lucide-react";
 import PromptCardStack from "@/components/PromptCardStack";
+import ProblemSection from "@/components/ProblemSection";
 
 const steps = [
   {
@@ -120,7 +121,9 @@ const Index = () => {
         </div>
       </section>
 
-      <div className="amber-rule" />
+      {/* Problem / Solution */}
+      <ProblemSection />
+
 
       {/* How it Works */}
       <section id="how-it-works" className="container py-24">
