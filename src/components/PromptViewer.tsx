@@ -119,15 +119,43 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
   if (isLoading) {
     return (
       <div className="flex h-[calc(100vh-64px)] gap-0">
-        <div className="w-[220px] shrink-0 border-r border-border bg-card p-4 space-y-3">
+        {/* Category sidebar skeleton */}
+        <div className="hidden lg:block w-[220px] shrink-0 border-r border-border bg-card p-4 space-y-4">
+          <Skeleton className="h-5 w-24 mb-6" />
           {[...Array(7)].map((_, i) => (
-            <Skeleton key={i} className="h-8 w-full bg-muted" />
+            <div key={i} className="flex items-center gap-2">
+              <Skeleton className="h-2.5 w-2.5 rounded-full" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-3.5 w-8" />
+            </div>
+          ))}
+          <div className="mt-8 space-y-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-1.5 w-full rounded-full" />
+          </div>
+        </div>
+        {/* Prompt list skeleton */}
+        <div className="flex-1 p-6 space-y-3">
+          <Skeleton className="h-6 w-48 mb-4" />
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-card border border-border p-3">
+              <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+              <Skeleton className="h-2.5 w-2.5 shrink-0 rounded-full" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-7 w-7 shrink-0 rounded-button" />
+            </div>
           ))}
         </div>
-        <div className="flex-1 p-6 space-y-3">
-          {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full bg-muted" />
-          ))}
+        {/* Detail panel skeleton */}
+        <div className="hidden lg:block w-[40%] shrink-0 border-l border-border p-6 space-y-5">
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-card" />
+          <Skeleton className="h-11 w-full rounded-button" />
+          <Skeleton className="h-9 w-full rounded-button" />
         </div>
       </div>
     );
