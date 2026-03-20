@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, RefreshCw, Download } from "lucide-react";
+import { Copy, Check, RefreshCw, Download, List, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,6 +16,7 @@ import PromptDetailPanel from "@/components/PromptDetailPanel";
 import CopyConfetti from "@/components/CopyConfetti";
 import LoopPromptHeader from "@/components/LoopPromptHeader";
 import GenerateLoopPromptsCard from "@/components/GenerateLoopPromptsCard";
+import DependencyGraph from "@/components/DependencyGraph";
 import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
 import { toast } from "sonner";
 
@@ -49,6 +50,7 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   const promptData: PromptData[] = useMemo(
@@ -178,6 +180,31 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {/* View toggle */}
+              <div className="hidden sm:flex items-center rounded-full border border-border p-0.5">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-body text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                    viewMode === "list"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <List className="h-3 w-3" />
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode("graph")}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-body text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                    viewMode === "graph"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <GitBranch className="h-3 w-3" />
+                  Graph
+                </button>
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -274,151 +301,159 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
             </div>
           </div>
 
-          {/* Prompt list (center) */}
-          <div className="flex-1 min-w-0 overflow-y-auto border-r border-border lg:flex-[1_1_0]">
-            {/* Mobile category pills */}
-            <div className="flex gap-1.5 overflow-x-auto border-b border-border px-4 py-3 md:hidden">
-              {CATEGORY_ORDER.map((cat) => {
-                const count = categoryCounts[cat] || 0;
-                if (cat !== "ALL" && count === 0) return null;
-                const isActive = activeCategory === cat;
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setActiveCategory(cat);
-                      setSelectedPromptId(null);
-                    }}
-                    className={`shrink-0 rounded-full px-3 py-1 font-body text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted/30 text-muted-foreground"
-                    }`}
-                  >
-                    {cat} ({count})
-                  </button>
-                );
-              })}
-            </div>
+          {/* Center panel: List or Graph */}
+          {viewMode === "graph" ? (
+            <DependencyGraph
+              prompts={promptData}
+              selectedPromptId={selectedPromptId}
+              onSelectPrompt={handleSelectPrompt}
+            />
+          ) : (
+            <div className="flex-1 min-w-0 overflow-y-auto border-r border-border lg:flex-[1_1_0]">
+              {/* Mobile category pills */}
+              <div className="flex gap-1.5 overflow-x-auto border-b border-border px-4 py-3 md:hidden">
+                {CATEGORY_ORDER.map((cat) => {
+                  const count = categoryCounts[cat] || 0;
+                  if (cat !== "ALL" && count === 0) return null;
+                  const isActive = activeCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        setActiveCategory(cat);
+                        setSelectedPromptId(null);
+                      }}
+                      className={`shrink-0 rounded-full px-3 py-1 font-body text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted/30 text-muted-foreground"
+                      }`}
+                    >
+                      {cat} ({count})
+                    </button>
+                  );
+                })}
+              </div>
 
-            {/* Loop prompts header */}
-            {activeCategory === "LOOP" && (categoryCounts["LOOP"] || 0) > 0 && (
-              <LoopPromptHeader />
-            )}
+              {/* Loop prompts header */}
+              {activeCategory === "LOOP" && (categoryCounts["LOOP"] || 0) > 0 && (
+                <LoopPromptHeader />
+              )}
 
-            {/* Generate loop prompts CTA if none exist */}
-            {activeCategory === "LOOP" && (categoryCounts["LOOP"] || 0) === 0 && (
-              <GenerateLoopPromptsCard projectId={projectId} />
-            )}
+              {/* Generate loop prompts CTA if none exist */}
+              {activeCategory === "LOOP" && (categoryCounts["LOOP"] || 0) === 0 && (
+                <GenerateLoopPromptsCard projectId={projectId} />
+              )}
 
-            <div className="divide-y divide-border">
-              {filteredPrompts.map((prompt) => {
-                const isCopied = copiedSet.has(prompt.id);
-                const isSelected = selectedPrompt?.id === prompt.id;
-                const isLoop = prompt.is_loop;
-                const dotClass =
-                  CATEGORY_COLORS[prompt.category.toUpperCase()] ||
-                  "bg-muted-foreground";
+              <div className="divide-y divide-border">
+                {filteredPrompts.map((prompt) => {
+                  const isCopied = copiedSet.has(prompt.id);
+                  const isSelected = selectedPrompt?.id === prompt.id;
+                  const isLoop = prompt.is_loop;
+                  const dotClass =
+                    CATEGORY_COLORS[prompt.category.toUpperCase()] ||
+                    "bg-muted-foreground";
 
-                if (isLoop) {
-                  const repeatCount = getRepeatCount(prompt.title, prompt.purpose);
-                  const auditTag = getAuditTag(prompt.title);
+                  if (isLoop) {
+                    const repeatCount = getRepeatCount(prompt.title, prompt.purpose);
+                    const auditTag = getAuditTag(prompt.title);
+                    return (
+                      <button
+                        key={prompt.id}
+                        onClick={() => handleSelectPrompt(prompt.id)}
+                        className={`flex w-full items-start gap-3 border-l-4 border-l-primary px-4 py-4 text-left transition-colors group ${
+                          isSelected ? "bg-primary/5" : "hover:bg-muted/20"
+                        }`}
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <RefreshCw className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-heading text-sm text-foreground truncate">
+                              {prompt.title}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 font-body text-[10px] font-semibold text-primary">
+                              Repeat {repeatCount}x
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-muted-foreground">
+                              {auditTag}
+                            </span>
+                          </div>
+                          <p className="mt-1 font-body text-xs text-muted-foreground line-clamp-2">
+                            {prompt.purpose}
+                          </p>
+                        </div>
+                        {isCopied ? (
+                          <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))] mt-1" />
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyPrompt(prompt);
+                            }}
+                            className="shrink-0 rounded-button p-1.5 text-muted-foreground opacity-0 transition-all hover:text-primary group-hover:opacity-100 active:scale-[0.95] mt-1"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                        )}
+                      </button>
+                    );
+                  }
+
                   return (
                     <button
                       key={prompt.id}
                       onClick={() => handleSelectPrompt(prompt.id)}
-                      className={`flex w-full items-start gap-3 border-l-4 border-l-primary px-4 py-4 text-left transition-colors group ${
+                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors group ${
                         isSelected ? "bg-primary/5" : "hover:bg-muted/20"
                       }`}
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-                        <RefreshCw className="h-4 w-4 text-primary" />
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/40 font-body text-xs text-muted-foreground">
+                        {prompt.sequence_order}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-heading text-sm text-foreground truncate">
-                            {prompt.title}
-                          </span>
-                          <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 font-body text-[10px] font-semibold text-primary">
-                            Repeat {repeatCount}x
-                          </span>
-                          <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-muted-foreground">
-                            {auditTag}
-                          </span>
-                        </div>
-                        <p className="mt-1 font-body text-xs text-muted-foreground line-clamp-2">
-                          {prompt.purpose}
-                        </p>
-                      </div>
+                      <div
+                        className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`}
+                      />
+                      <span className="flex-1 min-w-0 truncate font-body text-sm font-medium text-foreground">
+                        {prompt.title}
+                      </span>
                       {isCopied ? (
-                        <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))] mt-1" />
+                        <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))]" />
                       ) : (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopyPrompt(prompt);
                           }}
-                          className="shrink-0 rounded-button p-1.5 text-muted-foreground opacity-0 transition-all hover:text-primary group-hover:opacity-100 active:scale-[0.95] mt-1"
+                          className="shrink-0 rounded-button p-1.5 text-muted-foreground opacity-0 transition-all hover:text-primary group-hover:opacity-100 active:scale-[0.95]"
                         >
                           <Copy className="h-4 w-4" />
                         </button>
                       )}
                     </button>
                   );
-                }
-
-                return (
-                  <button
-                    key={prompt.id}
-                    onClick={() => handleSelectPrompt(prompt.id)}
-                    className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors group ${
-                      isSelected ? "bg-primary/5" : "hover:bg-muted/20"
-                    }`}
-                  >
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/40 font-body text-xs text-muted-foreground">
-                      {prompt.sequence_order}
-                    </div>
-                    <div
-                      className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`}
-                    />
-                    <span className="flex-1 min-w-0 truncate font-body text-sm font-medium text-foreground">
-                      {prompt.title}
-                    </span>
-                    {isCopied ? (
-                      <Check className="h-4 w-4 shrink-0 text-[hsl(var(--sage))]" />
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyPrompt(prompt);
-                        }}
-                        className="shrink-0 rounded-button p-1.5 text-muted-foreground opacity-0 transition-all hover:text-primary group-hover:opacity-100 active:scale-[0.95]"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Mobile progress bar */}
-            <div className="border-t border-border p-4 md:hidden">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="font-body text-[10px] text-muted-foreground">
-                  {copiedCount}/{totalCount} copied
-                </span>
+                })}
               </div>
-              <div className="h-1.5 w-full rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-500"
-                  style={{
-                    width: `${totalCount > 0 ? (copiedCount / totalCount) * 100 : 0}%`,
-                  }}
-                />
+
+              {/* Mobile progress bar */}
+              <div className="border-t border-border p-4 md:hidden">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-body text-[10px] text-muted-foreground">
+                    {copiedCount}/{totalCount} copied
+                  </span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{
+                      width: `${totalCount > 0 ? (copiedCount / totalCount) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Desktop detail panel */}
           <div className="hidden w-[40%] shrink-0 bg-background lg:block">
