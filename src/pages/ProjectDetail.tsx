@@ -318,16 +318,16 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { data: project, isLoading, error } = useProject(id, {
-    refetchInterval: undefined, // will be set dynamically below
+  const [isGeneratingStatus, setIsGeneratingStatus] = useState(false);
+
+  const { data: activeProject, isLoading, error } = useProject(id, {
+    refetchInterval: isGeneratingStatus ? 3000 : false,
   });
 
-  // Poll when generating
-  const { data: polledProject } = useProject(id, {
-    refetchInterval: project?.status === "generating" ? 3000 : false,
-  });
-
-  const activeProject = polledProject ?? project;
+  // Track generating status for polling
+  useEffect(() => {
+    setIsGeneratingStatus(activeProject?.status === "generating");
+  }, [activeProject?.status]);
 
   if (isLoading) {
     return (

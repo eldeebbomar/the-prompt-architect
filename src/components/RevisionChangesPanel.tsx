@@ -109,7 +109,7 @@ const SimpleDiff = ({
   }
 
   return (
-    <div className="space-y-1.5 rounded-lg border border-border bg-[hsl(var(--obsidian))] p-3 font-mono text-[11px] leading-relaxed max-h-[240px] overflow-y-auto">
+    <div className="space-y-1.5 rounded-lg border border-border bg-[hsl(var(--surface-elevated))] p-3 font-mono text-[11px] leading-relaxed max-h-[240px] overflow-y-auto">
       {removed.slice(0, 15).map((line, i) => (
         <div
           key={`r-${i}`}
@@ -206,7 +206,7 @@ const RevisionChangesPanel = ({
                       newText={cp.prompt_text}
                     />
                   ) : (
-                    <div className="rounded-lg border border-border bg-[hsl(var(--obsidian))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
+                    <div className="rounded-lg border border-border bg-[hsl(var(--surface-elevated))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
                       {cp.prompt_text.slice(0, 500)}
                       {cp.prompt_text.length > 500 && "…"}
                     </div>
@@ -243,7 +243,7 @@ const RevisionChangesPanel = ({
             <div className="px-4 py-3">
               <ExpandableCard
                 expandContent={
-                  <div className="rounded-lg border border-border bg-[hsl(var(--obsidian))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
+                  <div className="rounded-lg border border-border bg-[hsl(var(--surface-elevated))] p-3 font-mono text-[11px] leading-relaxed text-foreground/80 max-h-[200px] overflow-y-auto">
                     {np.prompt_text.slice(0, 500)}
                     {np.prompt_text.length > 500 && "…"}
                   </div>
