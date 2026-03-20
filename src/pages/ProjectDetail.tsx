@@ -215,20 +215,18 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
               return;
             }
 
-            const { reply, phase: respPhase, is_complete, spec_data } = invokeData as {
+            const { reply, phase: respPhase } = invokeData as {
               reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
             };
 
-            await supabase.from("conversations").insert({
-              project_id: id, role: "assistant", content: reply, phase: respPhase || "discovery",
-              metadata: spec_data ? ({ spec_data } as unknown as Json) : {},
-            });
+            // Display reply optimistically
+            const tempAssistantId = `opt-assistant-${Date.now()}`;
+            setOptimisticMessages((prev) => [
+              ...prev,
+              { id: tempAssistantId, role: "assistant", content: reply, created_at: new Date().toISOString(), phase: respPhase || "discovery", project_id: id, metadata: {} },
+            ]);
 
-            if (spec_data && Object.keys(spec_data).length > 0) {
-              const currentSpec = typeof project.spec_data === "object" && project.spec_data !== null ? project.spec_data : {};
-              await supabase.from("projects").update({ spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as Json }).eq("id", id);
-            }
-
+            // n8n saves assistant message, spec_data, and status — just refetch
             queryClient.invalidateQueries({ queryKey: ["conversations", id] });
             queryClient.invalidateQueries({ queryKey: ["project", id] });
           } catch {
@@ -268,29 +266,24 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         throw invokeError;
       }
 
-      const { reply, phase, is_complete, spec_data } = invokeData as {
+      const { reply, phase, is_complete } = invokeData as {
         reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
       };
 
-      await supabase.from("conversations").insert({
-        project_id: id, role: "assistant", content: reply, phase: phase || "discovery",
-        metadata: spec_data ? ({ spec_data } as unknown as Json) : {},
-      });
-
-      if (spec_data && Object.keys(spec_data).length > 0) {
-        const currentSpec = typeof project.spec_data === "object" && project.spec_data !== null ? project.spec_data : {};
-        await supabase.from("projects").update({ spec_data: { ...(currentSpec as Record<string, unknown>), ...spec_data } as Json }).eq("id", id);
-      }
+      // Display reply optimistically
+      const tempAssistantId = `opt-assistant-${Date.now()}`;
+      setOptimisticMessages((prev) => [
+        ...prev,
+        { id: tempAssistantId, role: "assistant", content: reply, created_at: new Date().toISOString(), phase: phase || "discovery", project_id: id, metadata: {} },
+      ]);
 
       if (is_complete) {
-        await supabase.from("conversations").insert({ project_id: id, role: "system", content: "✓ Discovery complete. Let's review your project spec.", phase: "discovery" });
-        await supabase.from("projects").update({ status: "generating" }).eq("id", id);
         toast.success("Discovery complete! Review your spec in the sidebar.");
       }
 
+      // n8n saves assistant message, spec_data, status, and system messages — just refetch
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       queryClient.invalidateQueries({ queryKey: ["project", id] });
-      setOptimisticMessages([]);
     } catch {
       setIsTyping(false);
       toast.error("Something went wrong. Please try again.");
@@ -380,8 +373,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   const handleEndDiscovery = async () => {
     try {
-      await supabase.from("conversations").insert({ project_id: id, role: "system", content: "✓ Discovery ended early. Review your project spec.", phase: "discovery" });
-      await supabase.from("projects").update({ status: "generating" }).eq("id", id);
+      // Invoke edge function to end discovery — n8n handles status + system message
+      await supabase.functions.invoke("discovery-webhook", {
+        body: { project_id: id, message: "__END_DISCOVERY__" },
+      });
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       toast.info("Discovery ended. Review your spec and generate prompts.");
@@ -403,19 +398,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         success: boolean; prompt_count: number;
         prompts: Array<{ category: string; sequence_order: number; title: string; purpose: string; prompt_text: string; depends_on: number[]; is_loop: boolean }>;
       };
-      if (!success || !prompts?.length) throw new Error("No prompts returned");
+      if (!success) throw new Error("No prompts returned");
 
-      setPromptCount(prompt_count || prompts.length);
+      setPromptCount(prompt_count || prompts?.length || 0);
       setGenerationDone(true);
 
-      const { error: insertError } = await supabase.from("generated_prompts").insert(
-        prompts.map((p) => ({ project_id: id, category: p.category, sequence_order: p.sequence_order, title: p.title, purpose: p.purpose, prompt_text: p.prompt_text, depends_on: p.depends_on || [], is_loop: p.is_loop || false }))
-      );
-      if (insertError) { toast.error("Failed to save prompts."); return; }
-
-      await supabase.from("projects").update({ status: "ready" }).eq("id", id);
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
-
+      // n8n saves prompts and updates project status — just refetch
       setTimeout(() => {
         setIsGenerating(false);
         setGenerationDone(false);

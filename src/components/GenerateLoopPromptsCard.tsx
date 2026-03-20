@@ -30,27 +30,7 @@ const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) =>
 
       if (error) throw error;
 
-      if (data?.loop_prompts?.length) {
-        const inserts = data.loop_prompts.map(
-          (lp: { title: string; purpose: string; prompt_text: string; repeat_count?: number }, i: number) => ({
-            project_id: projectId,
-            title: lp.title,
-            purpose: lp.purpose,
-            prompt_text: lp.prompt_text,
-            category: "loop",
-            is_loop: true,
-            sequence_order: 900 + i,
-            depends_on: [],
-          })
-        );
-
-        const { error: insertError } = await supabase
-          .from("generated_prompts")
-          .insert(inserts);
-
-        if (insertError) throw insertError;
-      }
-
+      // n8n saves loop prompts to generated_prompts — just refetch
       queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
       toast.success(`${data?.loop_prompts?.length ?? 0} loop prompts generated!`);
     } catch {
