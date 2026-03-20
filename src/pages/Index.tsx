@@ -147,24 +147,22 @@ const Index = () => {
 
       {/* Example Prompts */}
       <section id="examples" className="container py-24">
-        <h2
-          className="mb-4 text-center font-heading text-3xl text-foreground opacity-0 animate-fade-up md:text-4xl"
-        >
-          Sample prompt output
-        </h2>
-        <p className="mx-auto mb-16 max-w-lg text-center font-body text-sm text-muted-foreground opacity-0 animate-fade-up" style={{ animationDelay: "80ms" }}>
-          Each prompt is production-ready, specific, and designed to build on the last.
-        </p>
+        <ScrollReveal className="text-center">
+          <h2 className="mb-4 font-heading text-3xl text-foreground md:text-4xl">
+            Sample prompt output
+          </h2>
+          <p className="mx-auto mb-16 max-w-lg font-body text-sm text-muted-foreground">
+            Each prompt is production-ready, specific, and designed to build on the last.
+          </p>
+        </ScrollReveal>
         <div className="mx-auto max-w-2xl space-y-4">
           {examplePrompts.map((prompt, i) => (
-            <div
-              key={i}
-              className="prompt-card flex items-start gap-4 rounded-card border border-border p-5 opacity-0 animate-fade-up"
-              style={{ animationDelay: `${i * 100 + 100}ms` }}
-            >
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sage" />
-              <p className="font-mono text-sm leading-relaxed text-foreground">{prompt}</p>
-            </div>
+            <ScrollReveal key={i} delay={i * 80 + 60}>
+              <div className="prompt-card flex items-start gap-4 rounded-card border border-border p-5">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sage" />
+                <p className="font-mono text-sm leading-relaxed text-foreground">{prompt}</p>
+              </div>
+            </ScrollReveal>
           ))}
         </div>
       </section>
