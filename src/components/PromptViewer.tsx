@@ -161,6 +161,27 @@ const PromptViewer = ({ projectId, projectName }: PromptViewerProps) => {
     );
   }
 
+  if (!promptData.length) {
+    return (
+      <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+        <div className="w-full max-w-[400px] text-center">
+          <FileText className="mx-auto mb-4 h-12 w-12 text-primary/50" />
+          <h2 className="font-heading text-xl text-foreground">No prompts generated yet</h2>
+          <p className="mt-2 font-body text-sm text-muted-foreground">
+            Complete the discovery phase first to generate your prompt blueprint.
+          </p>
+          <Button
+            variant="amber"
+            className="mt-5"
+            onClick={() => navigate(`/project/${projectId}`)}
+          >
+            Go to Discovery
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <ExportModal
