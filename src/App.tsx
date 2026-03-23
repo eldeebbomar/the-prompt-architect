@@ -23,6 +23,7 @@ const ProjectRevision = lazy(() => import("./pages/ProjectRevision"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Examples = lazy(() => import("./pages/Examples"));
 const Settings = lazy(() => import("./pages/Settings"));
+const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 const Billing = lazy(() => import("./pages/Billing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
