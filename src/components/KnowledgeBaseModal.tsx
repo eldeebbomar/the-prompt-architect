@@ -53,28 +53,13 @@ const KnowledgeBaseModal = ({
     if (!user) return;
     setGenerating(true);
     try {
-      const { data: secretData } = await supabase.functions.invoke("get-secret", {
-        body: { name: "N8N_WEBHOOK_BASE" },
-      });
-      const webhookBase =
-        secretData?.value || import.meta.env.VITE_N8N_WEBHOOK_BASE || "";
-
-      const res = await fetch(`${webhookBase}/webhook/generate-knowledge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, user_id: user.id }),
+      const { data: result, error: invokeError } = await supabase.functions.invoke("generate-prompts", {
+        body: { project_id: projectId, type: "knowledge" },
       });
 
-      if (!res.ok) {
-        const status = res.status;
-        if (status === 400) { toast.error("Missing required information. Please try again."); return; }
-        if (status === 401) { toast.error("Session expired. Please sign in again."); return; }
-        if (status === 402) { toast.error("You need credits to continue."); return; }
-        if (status === 429) { toast.info("You're sending messages too fast. Please wait a moment."); return; }
-        if (status === 500) { toast.error("Something went wrong on our end. Please try again."); return; }
-        throw new Error(`Request failed: ${status}`);
+      if (invokeError) {
+        throw invokeError;
       }
-      const result = await res.json();
 
       if (!result.success || !result.knowledge_base) {
         throw new Error("Failed to generate knowledge base");
@@ -176,19 +161,19 @@ const KnowledgeBaseModal = ({
               </div>
 
               {/* Content */}
-              <ScrollArea className="flex-1 min-h-0 max-h-[40vh]">
+              <div className="flex-1 min-h-0 max-h-[50vh] overflow-y-auto rounded-card border border-border bg-[#1A1815]">
                 {isEditing ? (
                   <Textarea
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
-                    className="min-h-[300px] font-mono text-[13px] bg-[#1A1815] border-border resize-none"
+                    className="min-h-[300px] border-none font-mono text-[13px] bg-transparent resize-none focus-visible:ring-0"
                   />
                 ) : (
-                  <pre className="whitespace-pre-wrap rounded-card bg-[#1A1815] border border-border p-4 font-mono text-[13px] text-foreground/90 leading-relaxed">
+                  <pre className="whitespace-pre-wrap p-4 font-mono text-[13px] text-foreground/90 leading-relaxed">
                     {kbText}
                   </pre>
                 )}
-              </ScrollArea>
+              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center py-12">

@@ -27,17 +27,17 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } =
-      await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
 
     const { project_id, message } = await req.json();
     if (!project_id || !message) {
@@ -77,7 +77,10 @@ Deno.serve(async (req) => {
 
     const n8nResponse = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         project_id,
         message,

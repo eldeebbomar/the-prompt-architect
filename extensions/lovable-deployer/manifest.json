@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Architect: Lovable Deployer",
+  "version": "1.0",
+  "description": "Automate prompt deployment from Prompt Architect to Lovable.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://lovable.dev/*", "http://localhost:5173/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon128.png"
+  },
+  "icons": {
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://lovable.dev/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ]
+}

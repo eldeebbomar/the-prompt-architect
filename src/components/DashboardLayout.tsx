@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sheet,
   SheetContent,
@@ -47,12 +49,34 @@ const DashboardLayout = () => {
     return location.pathname.startsWith(href);
   };
 
-  // Breadcrumb from path
+  const projectIdMatch = location.pathname.match(/\/project\/([0-9a-fA-F-]{36})/);
+  const projectId = projectIdMatch ? projectIdMatch[1] : null;
+
+  const { data: project } = useQuery({
+    queryKey: ["project-breadcrumb", projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
+      const { data } = await supabase
+        .from("projects")
+        .select("name")
+        .eq("id", projectId)
+        .single();
+      return data;
+    },
+    enabled: !!projectId,
+    staleTime: 60000,
+  });
+
+  // Breadcrumb from path (replace UUIDs with project name)
+  const isUUID = (str: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(str);
   const breadcrumb = location.pathname
     .replace("/dashboard", "")
     .split("/")
     .filter(Boolean)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
+    .map((s) => {
+      if (isUUID(s)) return project?.name || "Project";
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    });
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className="flex h-full flex-col">

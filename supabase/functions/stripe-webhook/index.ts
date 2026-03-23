@@ -60,7 +60,7 @@ serve(async (req: Request) => {
           // Set plan to unlimited
           await supabase
             .from("profiles")
-            .update({ plan: "unlimited" })
+            .update({ plan: "unlimited", revision_limit: 100 })
             .eq("id", userId);
 
           await supabase.rpc("add_credits", {
@@ -70,6 +70,13 @@ serve(async (req: Request) => {
             p_plan: "unlimited",
           });
         } else {
+          // Set revision limit based on pack size (usually 5 for pack)
+          const revisionLimit = priceType === "pack" || priceType === "5-pack" ? 5 : 2;
+          await supabase
+            .from("profiles")
+            .update({ plan: priceType, revision_limit: revisionLimit })
+            .eq("id", userId);
+
           await supabase.rpc("add_credits", {
             p_user_id: userId,
             p_amount: creditsToAdd,

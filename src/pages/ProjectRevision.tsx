@@ -82,8 +82,9 @@ const ProjectRevision = () => {
   );
 
   const plan = profile?.plan ?? "free";
-  const isUnlimited = plan === "unlimited" || plan === "5-pack";
-  const atLimit = !isUnlimited && revisionCount >= MAX_FREE_REVISIONS;
+  const maxRevisions = profile?.revision_limit ?? MAX_FREE_REVISIONS;
+  const isUnlimited = plan === "unlimited";
+  const atLimit = !isUnlimited && revisionCount >= maxRevisions;
 
   useEffect(() => {
     if (scrollRef.current) {

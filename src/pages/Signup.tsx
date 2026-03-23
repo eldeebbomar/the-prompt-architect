@@ -16,20 +16,33 @@ const Signup = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: window.location.origin,
-      },
-    });
-    setLoading(false);
-    if (error) {
-      toast.error("Sign up failed", { description: error.message, duration: 6000 });
-    } else {
-      toast.info("Check your email — we sent a confirmation link.");
-      navigate("/login");
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+          emailRedirectTo: window.location.origin,
+        },
+      });
+      if (error) {
+        console.error("Signup error:", error.message, error.status);
+        toast.error("Sign up failed", {
+          description: error.message || "Please check your details and try again.",
+          duration: 6000,
+        });
+      } else {
+        toast.info("Check your email — we sent a confirmation link.");
+        navigate("/login");
+      }
+    } catch (err) {
+      console.error("Unexpected signup error:", err);
+      toast.error("Sign up failed", {
+        description: "Something went wrong. Please try again.",
+        duration: 6000,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -20,10 +20,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Initialize regular client for auth, service role client to bypass RLS for credit deduction atomically
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
     const {
@@ -36,63 +42,62 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userId = user.id;
-    const { project_id, type } = await req.json();
-
-    if (!project_id) {
+    const { name, description } = await req.json();
+    if (!name || name.trim() === "") {
       return new Response(
-        JSON.stringify({ error: "project_id is required" }),
+        JSON.stringify({ error: "Project name is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { data: ownsIt } = await supabase.rpc("owns_project", {
-      _project_id: project_id,
+    // 1. Attempt to deduct credit with service role so it cannot be spoofed by browser
+    const { data: creditOk, error: creditError } = await supabaseAdmin.rpc("deduct_credit", {
+      p_user_id: user.id,
+      p_project_id: null,
+      p_description: `Project: ${name}`,
     });
-    if (!ownsIt) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+    if (creditError) {
+      console.error("Credit deduction error:", creditError);
+      throw creditError;
+    }
+
+    if (!creditOk) {
+      return new Response(
+        JSON.stringify({ error: "Insufficient credits" }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 2. Create the project AFTER credit is successfully docked
+    const { data: project, error: insertError } = await supabase
+      .from("projects")
+      .insert({
+        name,
+        description,
+        user_id: user.id,
+        status: "discovery"
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Project insert error:", insertError);
+      // Give them their credit back because insertion failed
+      await supabaseAdmin.rpc("add_credits", {
+        p_user_id: user.id,
+        p_amount: 1,
+        p_description: `Refund: Project creation failed`
       });
+      throw insertError;
     }
 
-    const webhookBase = Deno.env.get("N8N_WEBHOOK_BASE");
-    if (!webhookBase) {
-      return new Response(
-        JSON.stringify({ error: "Webhook not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Route to correct n8n webhook based on type
-    const webhookPath = type === "loop" ? "loop-prompts" : type === "knowledge" ? "generate-knowledge" : "generate-prompts";
-    const webhookUrl = `${webhookBase.replace(/\/$/, "")}/webhook/${webhookPath}`;
-
-    const n8nResponse = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ project_id, user_id: userId, type }),
-    });
-
-    if (!n8nResponse.ok) {
-      const errText = await n8nResponse.text();
-      console.error("n8n generate-prompts error:", n8nResponse.status, errText);
-      return new Response(
-        JSON.stringify({ error: "Prompt generation failed" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const result = await n8nResponse.json();
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({ project }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("generate-prompts error:", err);
+    console.error("create-project error:", err);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

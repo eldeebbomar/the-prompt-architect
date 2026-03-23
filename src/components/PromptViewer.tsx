@@ -60,17 +60,23 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
 
   const promptData: PromptData[] = useMemo(
     () =>
-      (prompts ?? []).map((p) => ({
-        id: p.id,
-        category: p.category,
-        sequence_order: p.sequence_order,
-        title: p.title,
-        purpose: p.purpose,
-        prompt_text: p.prompt_text,
-        is_loop: p.is_loop,
-        depends_on: p.depends_on,
-        repeat_count: (p as Record<string, unknown>).repeat_count as number | null | undefined,
-      })),
+      (prompts ?? []).map((p) => {
+        let cat = p.category.toUpperCase();
+        if (cat.includes("FINAL LOOP")) cat = "POLISH";
+        else if (cat.includes("CHECKPOINT LOOP")) cat = "CHECKPOINT";
+        
+        return {
+          id: p.id,
+          category: cat,
+          sequence_order: p.sequence_order,
+          title: p.title,
+          purpose: p.purpose,
+          prompt_text: p.prompt_text,
+          is_loop: p.is_loop,
+          depends_on: p.depends_on,
+          repeat_count: (p as Record<string, unknown>).repeat_count as number | null | undefined,
+        };
+      }),
     [prompts]
   );
 
@@ -92,6 +98,18 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     });
     return counts;
   }, [promptData]);
+
+  const displayCategories = useMemo(() => {
+    const base = CATEGORY_ORDER.filter(c => c !== "LOOP");
+    const otherCats: string[] = [];
+    Object.keys(categoryCounts).forEach((cat) => {
+      if (!base.includes(cat) && cat !== "ALL" && cat !== "LOOP") {
+        otherCats.push(cat);
+      }
+    });
+    // Final order: [ALL, ...base, ...others, LOOP]
+    return [...base, ...otherCats, "LOOP"];
+  }, [categoryCounts]);
 
   const filteredPrompts = useMemo(() => {
     if (activeCategory === "ALL") return promptData;
@@ -306,16 +324,16 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
               <Button
                 variant="outline"
                 size="sm"
-                className="hidden sm:inline-flex gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                className="hidden sm:inline-flex gap-1.5 border-primary/30 text-primary hover:bg-primary/20 hover:text-white"
                 onClick={() => setKbOpen(true)}
               >
                 <BookOpen className="h-3.5 w-3.5" />
-                <span className="hidden md:inline">📋 Knowledge Base</span>
+                <span className="hidden md:inline">Knowledge Base</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="hidden sm:inline-flex gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                className="hidden sm:inline-flex gap-1.5 border-primary/30 text-primary hover:bg-primary/20 hover:text-white"
                 onClick={() => navigate(`/project/${projectId}/revise`)}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -339,9 +357,9 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
           {/* Category sidebar */}
           <div className="hidden w-[220px] shrink-0 flex-col border-r border-border bg-card md:flex overflow-y-auto">
             <div className="p-4 space-y-1">
-              {CATEGORY_ORDER.map((cat) => {
+              {displayCategories.map((cat) => {
                 const count = categoryCounts[cat] || 0;
-                if (cat !== "ALL" && count === 0) return null;
+                if (cat !== "ALL" && cat !== "LOOP" && count === 0) return null;
                 const isActive = activeCategory === cat;
                 const dotClass =
                   cat === "ALL" ? "" : CATEGORY_COLORS[cat] || "bg-muted-foreground";
@@ -361,7 +379,9 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
                   >
                     {cat !== "ALL" && (
                       <div
-                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`}
+                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass} ${
+                          cat === "LOOP" && count === 0 ? "phase-dot-active shadow-[0_0_10px_hsl(var(--primary))]" : ""
+                        }`}
                       />
                     )}
                     <div className="flex-1 min-w-0">
@@ -419,9 +439,9 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
             <div className="flex-1 min-w-0 overflow-y-auto border-r border-border lg:flex-[1_1_0]">
               {/* Mobile category pills */}
               <div className="flex gap-1.5 overflow-x-auto border-b border-border px-4 py-3 md:hidden">
-                {CATEGORY_ORDER.map((cat) => {
+                {displayCategories.map((cat) => {
                   const count = categoryCounts[cat] || 0;
-                  if (cat !== "ALL" && count === 0) return null;
+                  if (cat !== "ALL" && cat !== "LOOP" && count === 0) return null;
                   const isActive = activeCategory === cat;
                   return (
                     <button

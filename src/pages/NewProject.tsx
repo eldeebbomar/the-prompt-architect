@@ -60,46 +60,28 @@ const NewProject = () => {
     setSubmitting(true);
 
     try {
-      // 1. Create project
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .insert({
-          name: result.data.name,
-          description: result.data.pitch,
-          user_id: user.id,
-          status: "discovery",
-        })
-        .select("id")
-        .single();
-
-      if (projectError || !project) {
-        toast.error("Failed to create project.");
-        setSubmitting(false);
-        return;
-      }
-
-      // 2. Deduct credit
-      const { data: creditOk, error: creditError } = await supabase.rpc("deduct_credit", {
-        p_user_id: user.id,
-        p_project_id: project.id,
-        p_description: `Project: ${result.data.name}`,
+      // 1. Create project & deduct credit atomically via secure Edge Function
+      const { data: createData, error: createError } = await supabase.functions.invoke("create-project", {
+        body: { name: result.data.name, description: result.data.pitch },
       });
 
-      if (creditError || !creditOk) {
-        // Delete the project we just created
-        await supabase.from("projects").delete().eq("id", project.id);
-        setShowCreditModal(true);
-        setSubmitting(false);
-        return;
+      if (createError) {
+        throw createError;
       }
 
-      // 3. Insert first conversation message (user's pitch)
-      await supabase.from("conversations").insert({
-        project_id: project.id,
-        role: "user",
-        content: result.data.pitch,
-        phase: "discovery",
-      });
+      if (createData?.error) {
+        if (createData.error === "Insufficient credits") {
+          setShowCreditModal(true);
+          setSubmitting(false);
+          return;
+        }
+        throw new Error(createData.error);
+      }
+
+      const project = createData.project;
+
+      // ProjectDetail.tsx handles inserting the first message and firing the webhook automatically 
+      // when it detects an empty conversation history.
 
       // Invalidate caches
       queryClient.invalidateQueries({ queryKey: ["projects"] });

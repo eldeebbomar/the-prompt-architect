@@ -165,6 +165,7 @@ export type Database = {
           full_name: string | null
           id: string
           plan: string
+          revision_limit: number
           stripe_customer_id: string | null
           total_credits_purchased: number
           updated_at: string
@@ -177,6 +178,7 @@ export type Database = {
           full_name?: string | null
           id: string
           plan?: string
+          revision_limit?: number
           stripe_customer_id?: string | null
           total_credits_purchased?: number
           updated_at?: string
@@ -189,6 +191,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           plan?: string
+          revision_limit?: number
           stripe_customer_id?: string | null
           total_credits_purchased?: number
           updated_at?: string

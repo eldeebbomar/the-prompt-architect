@@ -38,7 +38,7 @@ const plans = [
     features: [
       "Full AI discovery conversation",
       "50+ structured prompts",
-      "Up to 2 revisions",
+      "Up to 5 revisions",
       "Custom loop prompts",
       "Export & copy all",
       "Priority generation speed",
@@ -59,7 +59,6 @@ const plans = [
     features: [
       "Full AI discovery conversation",
       "50+ structured prompts",
-      "Up to 2 revisions",
       "Custom loop prompts",
       "Export & copy all",
       "Unlimited projects",

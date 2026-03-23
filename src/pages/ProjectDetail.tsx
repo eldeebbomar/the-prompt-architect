@@ -142,7 +142,11 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const allMessages = useMemo(() => {
     const real = messages ?? [];
     const realIds = new Set(real.map((m) => m.id));
-    const extras = optimisticMessages.filter((m) => !realIds.has(m.id));
+    // Match by content+role to catch optimistic messages that now exist in DB with different IDs
+    const realContentKeys = new Set(real.map((m) => `${m.role}::${m.content}`));
+    const extras = optimisticMessages.filter(
+      (m) => !realIds.has(m.id) && !realContentKeys.has(`${m.role}::${m.content}`)
+    );
     return [...real, ...extras];
   }, [messages, optimisticMessages]);
 
@@ -243,6 +247,8 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             ]);
 
             // n8n saves assistant message, spec_data, and status — just refetch
+            // Clear optimistic messages before refetch to prevent duplicates
+            setOptimisticMessages([]);
             queryClient.invalidateQueries({ queryKey: ["conversations", id] });
             queryClient.invalidateQueries({ queryKey: ["project", id] });
           } catch {
@@ -298,6 +304,8 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       }
 
       // n8n saves assistant message, spec_data, status, and system messages — just refetch
+      // Clear optimistic messages before refetch to prevent duplicates
+      setOptimisticMessages([]);
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       queryClient.invalidateQueries({ queryKey: ["project", id] });
     } catch {
@@ -417,14 +425,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         return;
       }
 
-      const { success, prompt_count, prompts } = invokeData as {
-        success: boolean; prompt_count: number;
-        prompts: Array<{ category: string; sequence_order: number; title: string; purpose: string; prompt_text: string; depends_on: number[]; is_loop: boolean }>;
-      };
-      if (!success) throw new Error("No prompts returned");
-
-      setPromptCount(prompt_count || prompts?.length || 0);
-      setGenerationDone(true);
+      // The edge function will trigger n8n, which responds immediately (async background task).
+      // We don't expect the prompt list in 'invokeData'. 
+      // Instead, we manually set the project to "generating" so the UI begins polling.
+      await supabase.from("projects").update({ status: "generating" }).eq("id", id);
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      toast.info("Prompt generation started in the background.");
 
       // n8n saves prompts and updates project status — just refetch
       setTimeout(() => {
@@ -536,7 +542,23 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                       onDelete={handleDeleteMessage}
                     />
                   );
-                  if (msg.role === "assistant") return <AssistantMessage key={msg.id} content={msg.content} createdAt={msg.created_at} />;
+                  if (msg.role === "assistant") return (
+                    <AssistantMessage
+                      key={msg.id}
+                      content={msg.content}
+                      createdAt={msg.created_at}
+                      onOptionClick={(text) => {
+                        const cleanText = text.replace("Select ↵", "").trim();
+                        if (cleanText.toLowerCase().includes("other") || cleanText.toLowerCase().includes("specify")) {
+                          setInput(cleanText);
+                          setTimeout(() => inputRef.current?.focus(), 50);
+                        } else {
+                          // Auto send if it's a regular option
+                          sendMessage(cleanText);
+                        }
+                      }}
+                    />
+                  );
                   if (msg.role === "system") return <SystemMessage key={msg.id} content={msg.content} />;
                   return null;
                 })}

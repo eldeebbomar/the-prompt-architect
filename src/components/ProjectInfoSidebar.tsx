@@ -11,6 +11,19 @@ const phases = [
 ];
 
 // Spec sections mapping from raw keys to display groups
+const formatValue = (v: unknown): string => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object" && !Array.isArray(v)) {
+    return Object.entries(v)
+      .map(([key, val]) => `${key}: ${val}`)
+      .join(", ");
+  }
+  if (Array.isArray(v)) {
+    return v.map(formatValue).join(", ");
+  }
+  return String(v);
+};
+
 const specSections = [
   {
     title: "App Overview",
@@ -73,7 +86,10 @@ const ProjectInfoSidebar = ({
   );
 
   const isDiscoveryComplete =
-    project.status === "generating" || project.status === "ready" || project.status === "completed";
+    specData.is_complete === true ||
+    project.status === "generating" ||
+    project.status === "ready" ||
+    project.status === "completed";
 
   // Render spec in grouped sections if complete
   const renderSpecReview = () => {
@@ -121,15 +137,15 @@ const ProjectInfoSidebar = ({
                   </p>
                   {Array.isArray(value) ? (
                     <ul className="mt-0.5 list-disc pl-4 space-y-0.5">
-                      {(value as string[]).map((item, i) => (
+                      {(value as unknown[]).map((item, i) => (
                         <li key={i} className="font-body text-sm text-foreground">
-                          {String(item)}
+                          {formatValue(item)}
                         </li>
                       ))}
                     </ul>
                   ) : (
                     <p className="mt-0.5 font-body text-sm text-foreground">
-                      {String(value)}
+                      {formatValue(value)}
                     </p>
                   )}
                 </div>
@@ -211,61 +227,83 @@ const ProjectInfoSidebar = ({
       )}
 
       {/* Spec review */}
-      {isDiscoveryComplete ? renderSpecReview() : (
-        specEntries.length > 0 && (
-          <div className="mt-8">
-            <p className="mb-3 font-body text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              Spec Preview
-            </p>
-            <div className="space-y-2.5">
-              {specEntries.map(([key, value]) => (
-                <div key={key}>
-                  <p className="font-body text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    {key.replace(/_/g, " ")}
-                  </p>
-                  <p className="mt-0.5 font-body text-sm text-foreground">
-                    {String(value)}
-                  </p>
-                </div>
-              ))}
+      <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+        {isDiscoveryComplete ? renderSpecReview() : (
+          specEntries.length > 0 && (
+            <div className="mt-8">
+              <p className="mb-4 font-body text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Spec Preview
+              </p>
+              <div className="space-y-4">
+                {specEntries.map(([key, value]) => {
+                  if (key === 'is_complete') return null;
+                  const label = key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+                  return (
+                    <div key={key} className="group">
+                      <p className="font-body text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 transition-colors group-hover:text-primary/70">
+                        {label}
+                      </p>
+                      <p className="mt-1 font-body text-sm text-foreground leading-relaxed">
+                        {formatValue(value)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )
-      )}
+          )
+        )}
+      </div>
 
       {/* Action buttons */}
-      <div className="mt-auto space-y-3 pt-6">
+      <div className="mt-auto space-y-3 pt-6 border-t border-primary/10">
         {isDiscoveryComplete && project.status !== "ready" && project.status !== "completed" && onGeneratePrompts && (
-          <>
+          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <Button
               variant="amber"
-              className="w-full gap-2"
-              size="lg"
+              className="w-full h-12 gap-2 text-sm font-semibold shadow-warm hover:scale-[1.01] active:scale-[0.98] transition-all"
               onClick={onGeneratePrompts}
               disabled={isGenerating}
             >
               <Sparkles className="h-4 w-4" />
               Generate My Prompts
             </Button>
-            <button
-              className="flex w-full items-center justify-center gap-1.5 rounded-button px-4 py-2 font-body text-sm text-muted-foreground transition-colors hover:text-foreground active:scale-[0.97]"
+            
+            <Button
+              variant="outline"
+              className="w-full h-11 gap-2 border-primary/20 text-primary hover:bg-primary/5 hover:text-primary font-medium"
               onClick={() => {
-                // Scroll chat input into view — the parent handles keeping the input visible
+                const input = document.querySelector('textarea');
+                if (input) input.focus();
               }}
             >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Continue chatting
-            </button>
-          </>
+              <MessageSquare className="h-4 w-4" />
+              Keep Refining
+            </Button>
+          </div>
         )}
 
-        {project.status === "discovery" && onEndDiscovery && (
-          <button
-            onClick={onEndDiscovery}
-            className="w-full rounded-button border border-muted-foreground/30 px-4 py-2.5 font-body text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground active:scale-[0.97]"
-          >
-            End Discovery Early
-          </button>
+        {project.status === "discovery" && !isDiscoveryComplete && onEndDiscovery && (
+          <div className="space-y-3">
+             <Button
+              variant="outline"
+              className="w-full h-11 gap-2 border-primary/20 text-primary hover:bg-primary/5 hover:text-primary font-medium"
+              onClick={() => {
+                const input = document.querySelector('textarea');
+                if (input) input.focus();
+              }}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Continue Discovery
+            </Button>
+
+            <button
+              onClick={onEndDiscovery}
+              className="w-full py-2 font-body text-[11px] font-medium uppercase tracking-widest text-muted-foreground/50 transition-colors hover:text-destructive/70"
+            >
+              End Discovery Early
+            </button>
+          </div>
         )}
       </div>
     </div>

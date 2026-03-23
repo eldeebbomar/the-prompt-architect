@@ -10,6 +10,7 @@ interface Profile {
   credits: number;
   total_credits_purchased: number;
   plan: string;
+  revision_limit: number;
   stripe_customer_id: string | null;
 }
 

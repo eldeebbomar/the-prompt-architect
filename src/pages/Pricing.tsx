@@ -21,9 +21,9 @@ const comparisonRows = [
   },
   {
     feature: "Revisions per Project",
-    free: "1",
+    free: "2",
     single: "2",
-    pack: "2",
+    pack: "5",
     unlimited: "Unlimited",
   },
   { feature: "Loop Prompts", free: true, single: true, pack: true, unlimited: true },

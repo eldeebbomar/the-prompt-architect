@@ -17,6 +17,7 @@ interface MessageProps {
   messageId?: string;
   onEdit?: (id: string, newContent: string) => void;
   onDelete?: (id: string) => void;
+  onOptionClick?: (text: string) => void;
 }
 
 const RelativeTime = ({ date }: { date: string }) => {
@@ -102,7 +103,7 @@ export const UserMessage = memo(({ content, createdAt, messageId, onEdit, onDele
 });
 UserMessage.displayName = "UserMessage";
 
-export const AssistantMessage = memo(({ content, createdAt }: MessageProps) => {
+export const AssistantMessage = memo(({ content, createdAt, onOptionClick }: MessageProps) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -123,8 +124,34 @@ export const AssistantMessage = memo(({ content, createdAt }: MessageProps) => {
         </div>
         <div className="relative">
           <div className="rounded-[12px_12px_12px_4px] bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-[15px] leading-relaxed text-foreground">
-            <div className="prose prose-sm prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_li]:text-foreground [&_strong]:text-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs">
-              <ReactMarkdown>{content}</ReactMarkdown>
+            <div className="prose prose-sm prose-invert max-w-none [&_p]:mb-3 [&_p:last-child]:mb-0 [&_strong]:text-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs">
+              <ReactMarkdown
+                components={{
+                  ul: ({ children }) => (
+                    <ul className="mt-4 mb-2 flex flex-col gap-2">{children}</ul>
+                  ),
+                  li: ({ children }) => {
+                    if (onOptionClick) {
+                      return (
+                        <li className="list-none group/option">
+                          <button
+                            onClick={(e) => onOptionClick(e.currentTarget.textContent || "")}
+                            className="text-left w-full border border-primary/30 bg-primary/5 hover:bg-primary/20 hover:border-primary/50 hover:text-primary-foreground rounded-md px-4 py-2.5 text-[14px] text-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 flex items-center justify-between"
+                          >
+                            <span>{children}</span>
+                            <span className="opacity-0 group-hover/option:opacity-100 transition-opacity text-xs font-mono ml-4">
+                              Select ↵
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    }
+                    return <li className="ml-4 list-disc text-foreground pb-1">{children}</li>;
+                  },
+                }}
+              >
+                {content}
+              </ReactMarkdown>
             </div>
           </div>
           <div className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">

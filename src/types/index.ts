@@ -9,6 +9,7 @@ export interface Profile {
   avatar_url: string | null;
   credits: number;
   plan: string;
+  revision_limit: number;
   stripe_customer_id: string | null;
   total_credits_purchased: number;
   created_at: string;
