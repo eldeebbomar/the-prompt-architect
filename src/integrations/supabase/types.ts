@@ -156,6 +156,27 @@ export type Database = {
           },
         ]
       }
+      lovable_docs: {
+        Row: {
+          content: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          content?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          content?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -165,7 +186,7 @@ export type Database = {
           full_name: string | null
           id: string
           plan: string
-          revision_limit: number
+          revision_limit: number | null
           stripe_customer_id: string | null
           total_credits_purchased: number
           updated_at: string
@@ -178,7 +199,7 @@ export type Database = {
           full_name?: string | null
           id: string
           plan?: string
-          revision_limit?: number
+          revision_limit?: number | null
           stripe_customer_id?: string | null
           total_credits_purchased?: number
           updated_at?: string
@@ -191,7 +212,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           plan?: string
-          revision_limit?: number
+          revision_limit?: number | null
           stripe_customer_id?: string | null
           total_credits_purchased?: number
           updated_at?: string
@@ -262,6 +283,15 @@ export type Database = {
         Returns: boolean
       }
       get_credit_stats: { Args: { p_user_id: string }; Returns: Json }
+      match_lovable_docs: {
+        Args: { filter?: Json; match_count?: number; query_embedding: string }
+        Returns: {
+          content: string
+          id: string
+          metadata: Json
+          similarity: number
+        }[]
+      }
       owns_project: { Args: { _project_id: string }; Returns: boolean }
     }
     Enums: {
