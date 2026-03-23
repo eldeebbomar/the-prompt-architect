@@ -23,6 +23,7 @@ const ProjectRevision = lazy(() => import("./pages/ProjectRevision"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Examples = lazy(() => import("./pages/Examples"));
 const Settings = lazy(() => import("./pages/Settings"));
+const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 const Billing = lazy(() => import("./pages/Billing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -78,6 +79,7 @@ const App = () => (
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dashboard/new" element={<NewProject />} />
                     <Route path="/dashboard/projects" element={<MyProjects />} />
+                    <Route path="/dashboard/extension" element={<ChromeExtension />} />
                     <Route path="/dashboard/billing" element={<Billing />} />
                     <Route path="/dashboard/settings" element={<Settings />} />
                     <Route path="/project/:id" element={<ProjectDetail />} />

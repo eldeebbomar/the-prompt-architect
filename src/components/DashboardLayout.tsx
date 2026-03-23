@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Rocket,
   FolderOpen,
+  Chrome,
   CreditCard,
   Settings,
   ChevronLeft,
@@ -28,6 +29,7 @@ const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "New Project", href: "/dashboard/new", icon: Rocket },
   { label: "My Projects", href: "/dashboard/projects", icon: FolderOpen },
+  { label: "Chrome Extension", href: "/dashboard/extension", icon: Chrome },
   { label: "Credits & Billing", href: "/dashboard/billing", icon: CreditCard },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
