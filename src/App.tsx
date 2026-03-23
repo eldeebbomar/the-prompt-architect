@@ -79,6 +79,7 @@ const App = () => (
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dashboard/new" element={<NewProject />} />
                     <Route path="/dashboard/projects" element={<MyProjects />} />
+                    <Route path="/dashboard/extension" element={<ChromeExtension />} />
                     <Route path="/dashboard/billing" element={<Billing />} />
                     <Route path="/dashboard/settings" element={<Settings />} />
                     <Route path="/project/:id" element={<ProjectDetail />} />
