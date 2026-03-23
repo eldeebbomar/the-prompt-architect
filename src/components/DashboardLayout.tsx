@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Rocket,
   FolderOpen,
+  Chrome,
   CreditCard,
   Settings,
   ChevronLeft,
