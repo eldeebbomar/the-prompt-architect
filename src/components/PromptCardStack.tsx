@@ -59,15 +59,18 @@ const PromptCardStack = () => {
       <div className="flex w-full max-w-[280px] flex-col items-center lg:max-w-[340px]">
         {promptCards.map((card, i) => {
           const isTop = i === 0;
-          // Each card after the first pulls up to overlap the one above
           const marginTop = i === 0 ? 0 : -12;
           const rotate = i % 2 === 0 ? i * 0.8 : i * -0.6;
           const translateX = i % 2 === 0 ? i * 4 : i * -3;
 
+          // Each card gets a unique gentle bob animation
+          const bobDuration = 3.5 + i * 0.7;
+          const bobDelay = i * 0.4;
+
           return (
             <div
               key={card.category}
-              className="w-full rounded-xl border border-border p-4 lg:p-5 transition-all duration-700"
+              className="w-full rounded-xl border border-border p-4 lg:p-5"
               style={{
                 background: "hsl(var(--prompt-card))",
                 boxShadow:
@@ -79,8 +82,10 @@ const PromptCardStack = () => {
                   ? `rotate(${rotate}deg) translateX(${translateX}px)`
                   : `rotate(${rotate}deg) translateX(${translateX}px) translateY(24px)`,
                 opacity: entered ? 1 : 0,
-                transitionDelay: `${i * 120}ms`,
-                transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+                transition: `opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${i * 120}ms, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${i * 120}ms`,
+                animation: entered
+                  ? `card-bob ${bobDuration}s ease-in-out ${bobDelay + 0.8}s infinite`
+                  : "none",
               }}
             >
               <span
