@@ -220,3 +220,15 @@ html {
 .copy-pop {
   animation: copy-pop 400ms ease-out;
 }
+
+/* Hero card gentle bob */
+@keyframes card-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes card-bob {
+    0%, 100% { transform: translateY(0); }
+  }
+}
