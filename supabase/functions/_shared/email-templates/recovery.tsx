@@ -24,19 +24,21 @@ export const RecoveryEmail = ({
 }: RecoveryEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Reset your password for LovPlan</Preview>
+    <Preview>Reset your password for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
         <Text style={logo}>LovPlan</Text>
         <Heading style={h1}>Reset your password</Heading>
         <Text style={text}>
-          We received a request to reset your password for LovPlan. Click the button below to choose a new password.
+          We received a request to reset your password for {siteName}. Click
+          the button below to choose a new password.
         </Text>
         <Button style={button} href={confirmationUrl}>
           Reset Password
         </Button>
         <Text style={footer}>
-          If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
+          If you didn't request a password reset, you can safely ignore this
+          email. Your password will not be changed.
         </Text>
       </Container>
     </Body>
@@ -46,9 +48,9 @@ export const RecoveryEmail = ({
 export default RecoveryEmail
 
 const main = { backgroundColor: '#ffffff', fontFamily: "'Outfit', 'Segoe UI', Arial, sans-serif" }
-const container = { padding: '40px 32px', maxWidth: '480px', margin: '0 auto' }
-const logo = { fontSize: '24px', fontWeight: 'bold' as const, color: '#D4952A', letterSpacing: '0.05em', margin: '0 0 32px', fontFamily: "'DM Serif Display', Georgia, serif" }
-const h1 = { fontSize: '26px', fontWeight: 'bold' as const, color: '#1a1a17', margin: '0 0 16px', fontFamily: "'DM Serif Display', Georgia, serif" }
-const text = { fontSize: '15px', color: '#6b6459', lineHeight: '1.6', margin: '0 0 24px' }
-const button = { backgroundColor: '#D4952A', color: '#1a1a17', fontSize: '15px', fontWeight: '600' as const, borderRadius: '8px', padding: '14px 28px', textDecoration: 'none' }
-const footer = { fontSize: '12px', color: '#a39e94', margin: '32px 0 0' }
+const container = { padding: '20px 25px' }
+const logo = { fontSize: '24px', fontWeight: 'bold' as const, color: '#D4952A', fontFamily: "'DM Serif Display', Georgia, serif", margin: '0 0 24px' }
+const h1 = { fontSize: '26px', fontWeight: 'bold' as const, color: '#1a1a17', fontFamily: "'DM Serif Display', Georgia, serif", margin: '0 0 20px' }
+const text = { fontSize: '14px', color: '#55575d', lineHeight: '1.5', margin: '0 0 25px' }
+const button = { backgroundColor: '#D4952A', color: '#ffffff', fontSize: '14px', borderRadius: '8px', padding: '12px 20px', textDecoration: 'none' }
+const footer = { fontSize: '12px', color: '#999999', margin: '30px 0 0' }
