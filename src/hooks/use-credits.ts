@@ -17,8 +17,16 @@ export function useCredits() {
       const { data, error } = await supabase.rpc("check_credits", { p_user_id: user.id });
       if (error) throw error;
 
+      // Fetch plan from profile to determine unlimited status reliably
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+
       const credits = data as number;
-      return { credits, isUnlimited: credits === 9999 };
+      const isUnlimited = profile?.plan === "unlimited";
+      return { credits, isUnlimited };
     },
   });
 }

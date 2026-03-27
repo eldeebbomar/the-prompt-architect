@@ -4,6 +4,7 @@ interface SEOProps {
   title?: string;
   description?: string;
   ogImage?: string;
+  structuredData?: Record<string, unknown>;
 }
 
 const defaults = {
@@ -17,6 +18,7 @@ const SEO = ({
   title,
   description = defaults.description,
   ogImage = defaults.ogImage,
+  structuredData,
 }: SEOProps) => {
   const fullTitle = title ? `${title} — LovPlan` : defaults.title;
 
@@ -32,6 +34,11 @@ const SEO = ({
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={ogImage} />
+      {structuredData && (
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      )}
     </Helmet>
   );
 };

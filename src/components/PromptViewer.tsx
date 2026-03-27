@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, RefreshCw, Download, List, GitBranch, FileText, BookOpen } from "lucide-react";
+import { Copy, Check, RefreshCw, Download, List, GitBranch, FileText, BookOpen, Chrome, Search, SkipForward, ArrowUpRight, Share2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { supabase } from "@/integrations/supabase/client";
 import { useGeneratedPrompts } from "@/hooks/use-generated-prompts";
 import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
 import ExportModal from "@/components/ExportModal";
@@ -19,6 +20,8 @@ import LoopPromptHeader from "@/components/LoopPromptHeader";
 import GenerateLoopPromptsCard from "@/components/GenerateLoopPromptsCard";
 import DependencyGraph from "@/components/DependencyGraph";
 import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
+import TeamManager from "@/components/TeamManager";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -49,6 +52,7 @@ interface PromptViewerProps {
 
 const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { data: prompts, isLoading } = useGeneratedPrompts(projectId);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
@@ -57,6 +61,9 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
   const [localMetadata, setLocalMetadata] = useState<Json>(metadata);
   const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
+  const [sharingLoading, setSharingLoading] = useState(false);
 
   const promptData: PromptData[] = useMemo(
     () =>
@@ -86,9 +93,80 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     totalCount,
     allCopied,
     markCopied,
+    markAllCopied,
     copyAll,
     downloadMarkdown,
   } = usePromptExport(projectId, promptData, localMetadata);
+
+  // Refetch project metadata when user returns to the tab (e.g. after deploying via extension)
+  useEffect(() => {
+    const handleVisibility = async () => {
+      if (document.visibilityState !== "visible") return;
+      const { data } = await supabase
+        .from("projects")
+        .select("metadata")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (data?.metadata) setLocalMetadata(data.metadata);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [projectId]);
+
+  // Detect extension deployment — mark all prompts as copied
+  const metaObj = useMemo(() => {
+    return typeof localMetadata === "object" && localMetadata && !Array.isArray(localMetadata)
+      ? (localMetadata as Record<string, unknown>)
+      : {};
+  }, [localMetadata]);
+  const deployedViaExtension = !!(metaObj.deployed_via === "chrome_extension" && metaObj.deployed_at);
+
+  const deployChecked = useRef(false);
+  useEffect(() => {
+    if (deployChecked.current || promptData.length === 0) return;
+    if (deployedViaExtension) {
+      markAllCopied();
+      deployChecked.current = true;
+    }
+  }, [deployedViaExtension, promptData.length, markAllCopied]);
+
+  // Fetch current sharing state
+  useEffect(() => {
+    supabase
+      .from("projects")
+      .select("is_public")
+      .eq("id", projectId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setIsPublic(!!data.is_public);
+      });
+  }, [projectId]);
+
+  const handleToggleShare = useCallback(async () => {
+    setSharingLoading(true);
+    const newVal = !isPublic;
+    const { error } = await supabase
+      .from("projects")
+      .update({ is_public: newVal })
+      .eq("id", projectId);
+    setSharingLoading(false);
+    if (error) {
+      toast.error("Failed to update sharing settings.");
+      return;
+    }
+    setIsPublic(newVal);
+    if (newVal) {
+      const url = `${window.location.origin}/share/${projectId}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Project is now public! Share link copied.");
+      } catch {
+        toast.success("Project is now public! Share link: " + url);
+      }
+    } else {
+      toast.success("Project is now private.");
+    }
+  }, [isPublic, projectId]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: promptData.length };
@@ -112,11 +190,28 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
   }, [categoryCounts]);
 
   const filteredPrompts = useMemo(() => {
-    if (activeCategory === "ALL") return promptData;
-    return promptData.filter(
+    let result = activeCategory === "ALL" ? promptData : promptData.filter(
       (p) => p.category.toUpperCase() === activeCategory
     );
-  }, [promptData, activeCategory]);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          p.purpose.toLowerCase().includes(q) ||
+          p.prompt_text.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [promptData, activeCategory, searchQuery]);
+
+  // Next uncompleted prompt (sorted by sequence_order)
+  const nextUncompleted = useMemo(() => {
+    return promptData
+      .slice()
+      .sort((a, b) => a.sequence_order - b.sequence_order)
+      .find((p) => !copiedSet.has(p.id)) ?? null;
+  }, [promptData, copiedSet]);
 
   const selectedPrompt = useMemo(() => {
     if (!selectedPromptId) return filteredPrompts[0] ?? null;
@@ -131,6 +226,13 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     },
     [markCopied]
   );
+
+  const handleCopyNext = useCallback(async () => {
+    if (!nextUncompleted) return;
+    await handleCopyPrompt(nextUncompleted);
+    setSelectedPromptId(nextUncompleted.id);
+    if (window.innerWidth < 1024) setMobileDetailOpen(true);
+  }, [nextUncompleted, handleCopyPrompt]);
 
   const handleSelectPrompt = useCallback((id: string) => {
     setSelectedPromptId(id);
@@ -291,8 +393,11 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
                 {projectName}
               </h1>
               <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded-button border border-[hsl(var(--sage))]/50 bg-[hsl(var(--sage))]/10 px-3 py-1 font-body text-xs font-medium text-[hsl(var(--sage))]">
-                <Check className="h-3 w-3" />
-                {totalCount} Prompts Ready
+                {deployedViaExtension ? (
+                  <><Chrome className="h-3 w-3" /> {totalCount} Prompts Deployed</>
+                ) : (
+                  <><Check className="h-3 w-3" /> {totalCount} Prompts Ready</>
+                )}
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -330,6 +435,7 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
                 <BookOpen className="h-3.5 w-3.5" />
                 <span className="hidden md:inline">Knowledge Base</span>
               </Button>
+              <TeamManager projectId={projectId} isOwner={true} />
               <Button
                 variant="outline"
                 size="sm"
@@ -339,10 +445,39 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
                 <RefreshCw className="h-3.5 w-3.5" />
                 <span className="hidden md:inline">Revise Prompts</span>
               </Button>
+              {nextUncompleted ? (
+                <Button
+                  variant="amber"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={handleCopyNext}
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Copy Next: #{nextUncompleted.sequence_order}</span>
+                  <span className="sm:hidden">Next</span>
+                </Button>
+              ) : allCopied ? (
+                <Button variant="amber" size="sm" className="gap-1.5" disabled>
+                  <Check className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">All Done</span>
+                </Button>
+              ) : null}
               <Button
-                variant="amber"
+                variant="outline"
                 size="sm"
-                className="gap-1.5"
+                className={`hidden sm:inline-flex gap-1.5 border-primary/30 hover:bg-primary/20 hover:text-white ${
+                  isPublic ? "text-[hsl(var(--sage))]" : "text-primary"
+                }`}
+                onClick={handleToggleShare}
+                disabled={sharingLoading}
+              >
+                {sharingLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+                <span className="hidden md:inline">{isPublic ? "Shared" : "Share"}</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-primary/30 text-primary hover:bg-primary/20 hover:text-white"
                 onClick={() => setExportOpen(true)}
               >
                 <Download className="h-3.5 w-3.5" />
@@ -422,8 +557,24 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
               </div>
               {allCopied && (
                 <p className="mt-2 text-center font-body text-xs text-[hsl(var(--sage))]">
-                  All prompts copied! 🎉
+                  {deployedViaExtension ? "Deployed via Extension" : "All prompts copied!"} 🎉
                 </p>
+              )}
+              {allCopied && profile?.plan && profile.plan !== "unlimited" && (
+                <button
+                  onClick={() => navigate("/pricing")}
+                  className="mt-3 flex w-full items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-left transition-colors hover:bg-primary/10"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body text-xs font-medium text-foreground">Build your next app</p>
+                    <p className="font-body text-[10px] text-muted-foreground">
+                      {profile.plan === "single" || profile.plan === "free"
+                        ? "5-Pack: $9/project instead of $12.99"
+                        : "Upgrade for unlimited projects"}
+                    </p>
+                  </div>
+                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-primary" />
+                </button>
               )}
             </div>
           </div>
@@ -471,6 +622,20 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
               {activeCategory === "LOOP" && (categoryCounts["LOOP"] || 0) === 0 && (
                 <GenerateLoopPromptsCard projectId={projectId} />
               )}
+
+              {/* Search bar */}
+              <div className="border-b border-border px-4 py-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search prompts..."
+                    className="w-full rounded-input border border-border bg-transparent py-1.5 pl-8 pr-3 font-body text-xs text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
 
               <div className="divide-y divide-border">
                 {filteredPrompts.map((prompt) => {

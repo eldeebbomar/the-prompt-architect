@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
+import { useGenerationNotifier } from "@/hooks/use-generation-notifier";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { WifiOff } from "lucide-react";
 import {
   LayoutDashboard,
   Rocket,
@@ -38,6 +41,8 @@ const DashboardLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, profile, signOut } = useAuth();
+  useGenerationNotifier(user?.id);
+  const isOnline = useOnlineStatus();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -220,6 +225,16 @@ const DashboardLayout = () => {
             </div>
           </div>
         </header>
+
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2">
+            <WifiOff className="h-3.5 w-3.5 text-destructive" />
+            <span className="font-body text-xs text-destructive">
+              You appear to be offline. Reconnect to continue.
+            </span>
+          </div>
+        )}
 
         {/* Page content */}
         <main id="main-content" className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">

@@ -41,47 +41,49 @@ serve(async (req: Request) => {
         const userId = session.metadata?.user_id;
         const priceType = session.metadata?.price_type;
         const creditsToAdd = parseInt(session.metadata?.credits_to_add || "0", 10);
-        const paymentId = session.payment_intent as string || session.subscription as string || session.id;
+        // Use session ID as idempotency key — unique per checkout, survives webhook retries
+        const idempotencyKey = session.id;
 
         if (!userId || !priceType) {
           console.error("Missing metadata", session.metadata);
           break;
         }
 
-        // Store stripe customer id
+        // Store stripe customer id and clear any payment_failed flag
         if (session.customer) {
           await supabase
             .from("profiles")
-            .update({ stripe_customer_id: session.customer as string })
+            .update({ stripe_customer_id: session.customer as string, payment_failed: false })
             .eq("id", userId);
         }
 
         if (priceType === "unlimited") {
-          // Set plan to unlimited
           await supabase
             .from("profiles")
-            .update({ plan: "unlimited", revision_limit: 100 })
+            .update({ plan: "unlimited", revision_limit: 100, payment_failed: false })
             .eq("id", userId);
 
+          // add_credits is idempotent — safe against webhook retries
           await supabase.rpc("add_credits", {
             p_user_id: userId,
             p_amount: 0,
-            p_stripe_id: paymentId,
+            p_stripe_id: idempotencyKey,
             p_plan: "unlimited",
           });
         } else {
-          // Set revision limit based on pack size (usually 5 for pack)
-          const revisionLimit = priceType === "pack" || priceType === "5-pack" ? 5 : 2;
+          // Normalize "5-pack" → "pack" for consistency
+          const normalizedType = priceType === "5-pack" ? "pack" : priceType;
+          const revisionLimit = normalizedType === "pack" ? 5 : 2;
           await supabase
             .from("profiles")
-            .update({ plan: priceType, revision_limit: revisionLimit })
+            .update({ plan: normalizedType, revision_limit: revisionLimit })
             .eq("id", userId);
 
           await supabase.rpc("add_credits", {
             p_user_id: userId,
             p_amount: creditsToAdd,
-            p_stripe_id: paymentId,
-            p_plan: priceType,
+            p_stripe_id: idempotencyKey,
+            p_plan: normalizedType,
           });
         }
 
@@ -93,7 +95,41 @@ serve(async (req: Request) => {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
-        // Find user by stripe_customer_id
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id, plan")
+          .eq("stripe_customer_id", customerId)
+          .single();
+
+        if (profile) {
+          // Only downgrade if currently unlimited (don't touch credit-based plans)
+          if (profile.plan === "unlimited") {
+            await supabase
+              .from("profiles")
+              .update({ plan: "free", revision_limit: 2 })
+              .eq("id", profile.id);
+          }
+
+          // Log the cancellation in credit_transactions for audit trail
+          await supabase.from("credit_transactions").insert({
+            user_id: profile.id,
+            amount: 0,
+            type: "subscription_cancelled",
+            description: "Subscription cancelled — downgraded to free plan",
+            stripe_payment_id: subscription.id,
+          });
+
+          console.log(`[stripe-webhook] Subscription cancelled for ${profile.id}`);
+        }
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+        console.error(`[stripe-webhook] Payment failed for customer: ${customerId}, invoice: ${invoice.id}`);
+
+        // Find user and flag the payment failure so frontend can show a banner
         const { data: profile } = await supabase
           .from("profiles")
           .select("id")
@@ -103,16 +139,10 @@ serve(async (req: Request) => {
         if (profile) {
           await supabase
             .from("profiles")
-            .update({ plan: "free" })
+            .update({ payment_failed: true })
             .eq("id", profile.id);
-          console.log(`[stripe-webhook] Subscription cancelled for ${profile.id}`);
+          console.log(`[stripe-webhook] Flagged payment_failed for ${profile.id}`);
         }
-        break;
-      }
-
-      case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
-        console.error(`[stripe-webhook] Payment failed for customer: ${invoice.customer}, invoice: ${invoice.id}`);
         break;
       }
 

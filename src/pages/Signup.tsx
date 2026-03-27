@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -12,6 +12,8 @@ const Signup = () => {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refCode = searchParams.get("ref");
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +24,7 @@ const Signup = () => {
         password,
         options: {
           data: { full_name: fullName },
-          emailRedirectTo: "https://lovplan.com",
+          emailRedirectTo: window.location.origin,
         },
       });
       if (error) {
@@ -32,6 +34,10 @@ const Signup = () => {
           duration: 6000,
         });
       } else {
+        // Store referral code so it can be applied after email confirmation
+        if (refCode) {
+          localStorage.setItem("lovplan_referral_code", refCode);
+        }
         toast.info("Check your email — we sent a confirmation link.");
         navigate("/login");
       }
@@ -47,9 +53,12 @@ const Signup = () => {
   };
 
   const handleGoogle = async () => {
+    if (refCode) {
+      localStorage.setItem("lovplan_referral_code", refCode);
+    }
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: "https://lovplan.com/dashboard" },
+      options: { redirectTo: `${window.location.origin}/dashboard` },
     });
   };
 
@@ -64,9 +73,17 @@ const Signup = () => {
         <h1 className="mb-1 text-center font-heading text-3xl leading-[1.1] text-foreground">
           Start building
         </h1>
-        <p className="mb-8 text-center font-body text-sm text-muted-foreground">
+        <p className="mb-4 text-center font-body text-sm text-muted-foreground">
           Create your account to get started
         </p>
+
+        {refCode && (
+          <div className="mb-6 rounded-lg border border-secondary/30 bg-secondary/5 px-4 py-3 text-center">
+            <p className="font-body text-xs font-medium text-secondary">
+              You've been referred! Sign up and get a bonus credit.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>

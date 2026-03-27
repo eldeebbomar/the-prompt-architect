@@ -12,6 +12,7 @@ export interface Profile {
   revision_limit: number;
   stripe_customer_id: string | null;
   total_credits_purchased: number;
+  payment_failed: boolean;
   created_at: string;
   updated_at: string;
 }

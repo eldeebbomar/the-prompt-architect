@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
-import { Rocket, Coins } from "lucide-react";
+import { Rocket, Coins, Sparkles, LayoutTemplate, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +14,70 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
+
+const PROJECT_TEMPLATES = [
+  {
+    id: "saas-dashboard",
+    label: "SaaS Dashboard",
+    category: "Analytics",
+    description: "Admin dashboard with user management, analytics charts, subscription billing, and role-based access control.",
+    prefill: {
+      name: "SaaS Dashboard",
+      pitch: "An admin dashboard for SaaS products with real-time analytics, team management, role-based access, and subscription billing via Stripe.",
+    },
+  },
+  {
+    id: "ecommerce",
+    label: "E-Commerce Store",
+    category: "E-Commerce",
+    description: "Product catalog with cart, checkout, inventory management, order tracking, and an admin panel.",
+    prefill: {
+      name: "E-Commerce Store",
+      pitch: "A full-featured online store with product catalog, shopping cart, Stripe checkout, order management, and an admin dashboard for inventory.",
+    },
+  },
+  {
+    id: "social-platform",
+    label: "Social Platform",
+    category: "Social",
+    description: "User profiles, feeds, posts, comments, likes, real-time messaging, and notifications.",
+    prefill: {
+      name: "Social Platform",
+      pitch: "A social media platform with user profiles, content feeds, posts with comments and likes, real-time chat, and push notifications.",
+    },
+  },
+  {
+    id: "project-management",
+    label: "Project Management",
+    category: "Productivity",
+    description: "Kanban boards, task assignment, due dates, team collaboration, and file attachments.",
+    prefill: {
+      name: "Project Management Tool",
+      pitch: "A project management app with Kanban boards, task assignment, due dates, team collaboration, file attachments, and activity tracking.",
+    },
+  },
+  {
+    id: "booking-platform",
+    label: "Booking Platform",
+    category: "Marketplace",
+    description: "Service listings, calendar availability, booking flow, payments, and review system.",
+    prefill: {
+      name: "Booking Platform",
+      pitch: "A booking marketplace where service providers list availability, customers book appointments, pay online, and leave reviews.",
+    },
+  },
+  {
+    id: "learning-platform",
+    label: "Learning Platform",
+    category: "Education",
+    description: "Courses, video lessons, progress tracking, quizzes, certificates, and instructor dashboard.",
+    prefill: {
+      name: "Learning Platform",
+      pitch: "An online learning platform with video courses, progress tracking, quizzes, completion certificates, and an instructor dashboard.",
+    },
+  },
+];
 
 const projectSchema = z.object({
   name: z
@@ -35,11 +99,19 @@ const NewProject = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  const [tab, setTab] = useState<"blank" | "template">("blank");
   const [name, setName] = useState("");
   const [pitch, setPitch] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
+
+  const handleSelectTemplate = (template: typeof PROJECT_TEMPLATES[number]) => {
+    setName(template.prefill.name);
+    setPitch(template.prefill.pitch);
+    setTab("blank"); // Switch to form so user can customise
+    setErrors({});
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,8 +163,10 @@ const NewProject = () => {
 
       toast.success(`1 credit used for project: ${result.data.name}`);
       navigate(`/project/${project.id}`);
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Something went wrong. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -111,10 +185,60 @@ const NewProject = () => {
               What are you building?
             </h1>
             <p className="font-body text-sm text-muted-foreground">
-              Give your project a name and a quick description.
+              Start from scratch or pick a template to get going faster.
             </p>
           </div>
         </div>
+
+        {/* Tabs */}
+        <div className="mb-6 flex rounded-lg border border-border bg-muted/30 p-1">
+          <button
+            type="button"
+            onClick={() => setTab("blank")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 font-body text-sm font-medium transition-colors ${
+              tab === "blank"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PenLine className="h-4 w-4" /> Blank Project
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("template")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 font-body text-sm font-medium transition-colors ${
+              tab === "template"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LayoutTemplate className="h-4 w-4" /> From Template
+          </button>
+        </div>
+
+        {/* Template gallery */}
+        {tab === "template" && (
+          <div className="mb-6 grid gap-3 sm:grid-cols-2">
+            {PROJECT_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => handleSelectTemplate(t)}
+                className="group rounded-card border border-border bg-card p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-warm"
+              >
+                <span className="mb-1 inline-block rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 font-body text-[10px] font-medium uppercase tracking-wider text-primary">
+                  {t.category}
+                </span>
+                <h4 className="mt-1.5 font-heading text-sm text-foreground group-hover:text-primary transition-colors">
+                  {t.label}
+                </h4>
+                <p className="mt-1 font-body text-xs text-muted-foreground line-clamp-2">
+                  {t.description}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -181,6 +305,39 @@ const NewProject = () => {
             This will use 1 credit from your account.
           </p>
         </form>
+
+        {/* Prompt preview — show what you'll get */}
+        <div className="mt-10 rounded-card border border-border bg-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h3 className="font-heading text-base text-foreground">What you'll get</h3>
+          </div>
+          <p className="font-body text-xs text-muted-foreground mb-4">
+            50+ structured prompts like these, tailored to your project:
+          </p>
+          <div className="space-y-2">
+            {[
+              { cat: "INFRASTRUCTURE", title: "Set up database schema with auth and security policies" },
+              { cat: "BACKEND", title: "Build core API endpoints and data models" },
+              { cat: "FRONTEND", title: "Create responsive UI components and navigation" },
+            ].map((sample) => (
+              <div
+                key={sample.title}
+                className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/10 px-3 py-2.5"
+              >
+                <div className={`h-2 w-2 shrink-0 rounded-full ${
+                  sample.cat === "INFRASTRUCTURE" ? "bg-primary" :
+                  sample.cat === "BACKEND" ? "bg-[hsl(var(--sage))]" :
+                  "bg-[#6B8EBF]"
+                }`} />
+                <span className="font-body text-xs text-foreground">{sample.title}</span>
+              </div>
+            ))}
+            <p className="pt-1 text-center font-body text-[11px] text-muted-foreground">
+              + integration, polish, and self-healing loop prompts
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* No credits modal */}

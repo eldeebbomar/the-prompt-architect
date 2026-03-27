@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LovPlan Deployer</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Loading state -->
+    <div id="loading-screen" class="screen">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Not linked: pairing code entry -->
+    <div id="link-screen" class="screen hidden">
+      <div class="header">
+        <div class="logo">LP</div>
+        <h1>LovPlan Deployer</h1>
+      </div>
+      <p class="subtitle">Enter the 6-digit code from your LovPlan account</p>
+      <div class="code-inputs" id="code-inputs">
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="0" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="1" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="2" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="3" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="4" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="5" />
+      </div>
+      <button id="link-btn" class="btn-primary" disabled>Link Account</button>
+      <p id="link-error" class="error hidden"></p>
+      <p class="help-text">
+        Get a code at <a href="https://lovplan.app/dashboard/extension" target="_blank">lovplan.app/dashboard/extension</a>
+      </p>
+    </div>
+
+    <!-- Linked: project list -->
+    <div id="projects-screen" class="screen hidden">
+      <div class="user-bar">
+        <div class="user-info">
+          <span id="user-email" class="user-email"></span>
+          <span id="user-plan" class="plan-badge"></span>
+        </div>
+        <button id="unlink-btn" class="btn-ghost" title="Unlink account">Unlink</button>
+      </div>
+      <h2>Your Projects</h2>
+      <div id="project-list" class="project-list">
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <!-- Prompt detail for selected project -->
+    <div id="prompts-screen" class="screen hidden">
+      <button id="back-btn" class="btn-back">&larr; Back to Projects</button>
+      <h2 id="project-title"></h2>
+      <div id="resume-banner" class="resume-banner hidden"></div>
+      <div id="prompt-list" class="prompt-list"></div>
+      <div class="deploy-bar">
+        <button id="deploy-btn" class="btn-primary btn-deploy">Deploy to Lovable</button>
+        <p id="deploy-note" class="deploy-note hidden">Open lovable.dev first</p>
+      </div>
+    </div>
+
+    <!-- Deploying: progress -->
+    <div id="deploy-screen" class="screen hidden">
+      <h2 id="deploy-heading">Deploying...</h2>
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <p id="deploy-status" class="deploy-status">Starting...</p>
+      <div class="deploy-actions">
+        <button id="pause-deploy-btn" class="btn-ghost">Pause</button>
+        <button id="cancel-deploy-btn" class="btn-ghost btn-cancel">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Deploy complete -->
+    <div id="complete-screen" class="screen hidden">
+      <div class="complete-icon">&#10003;</div>
+      <h2>Deployment Complete!</h2>
+      <p id="complete-summary" class="subtitle"></p>
+      <button id="done-btn" class="btn-primary">Done</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

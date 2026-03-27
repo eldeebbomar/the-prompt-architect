@@ -48,7 +48,9 @@ export function handleWebhookError(
       options?.onRateLimit?.();
       return true;
     case 500:
-      toast.error("Something went wrong on our end. Please try again.");
+      toast.error("Something went wrong on our end. Please try again.", {
+        action: { label: "Retry", onClick: () => window.location.reload() },
+      });
       return true;
     default:
       return false;

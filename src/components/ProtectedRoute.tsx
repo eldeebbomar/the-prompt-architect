@@ -24,6 +24,18 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, profile, loading } = useAuth();
+
+  if (loading) return <FullPageLoader />;
+  if (!user) return <Navigate to="/login" replace />;
+  // Profile loads asynchronously after auth — wait for it
+  if (!profile) return <FullPageLoader />;
+  if (!profile.is_admin) return <Navigate to="/dashboard" replace />;
+
+  return <>{children}</>;
+};
+
 export const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 

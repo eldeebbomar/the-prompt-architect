@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Coins, FolderOpen, FileText, ArrowRight, Compass } from "lucide-react";
+import { Plus, Coins, FolderOpen, FileText, ArrowRight, Compass, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
 import { useRecentProjects, useProjectCount, usePromptCount } from "@/hooks/use-projects";
@@ -8,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import SEO from "@/components/SEO";
 import OnboardingTutorial from "@/components/OnboardingTutorial";
 
@@ -29,20 +31,80 @@ const Dashboard = () => {
   const { data: projects, isLoading: recentLoading } = useRecentProjects(4);
   const { data: promptCount, isLoading: promptsLoading } = usePromptCount();
 
-  // Handle payment success
+  // Apply stored referral code on first load
+  const referralApplied = useRef(false);
   useEffect(() => {
-    if (searchParams.get("payment") === "success") {
-      const plan = searchParams.get("plan") || "";
-      const planLabels: Record<string, string> = {
-        single: "1 credit",
-        pack: "5 credits",
-        unlimited: "Unlimited plan",
-      };
-      toast.success(`${planLabels[plan] || "Credits"} added to your account! 🎉`);
+    if (referralApplied.current) return;
+    const refCode = localStorage.getItem("lovplan_referral_code");
+    if (!refCode) return;
+    referralApplied.current = true;
+    localStorage.removeItem("lovplan_referral_code");
+
+    supabase.functions.invoke("apply-referral", {
+      body: { referral_code: refCode },
+    }).then(({ data, error }) => {
+      if (!error && data?.success) {
+        toast.success("Referral bonus applied! You got 1 free credit.");
+        queryClient.invalidateQueries({ queryKey: ["credits"] });
+        queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
+      }
+      // Silently ignore failures — user still gets their account
+    });
+  }, [queryClient]);
+
+  // Handle payment success — poll for credits to arrive before showing toast
+  const paymentPolled = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("payment") !== "success" || paymentPolled.current) return;
+    paymentPolled.current = true;
+
+    const plan = searchParams.get("plan") || "";
+    const planLabels: Record<string, string> = {
+      single: "1 credit",
+      pack: "5 credits",
+      unlimited: "Unlimited plan",
+    };
+
+    // Clean URL immediately so refresh doesn't re-trigger
+    setSearchParams({}, { replace: true });
+
+    const toastId = toast.loading("Processing payment...");
+
+    // Poll for credit update (webhook may take a few seconds)
+    let attempts = 0;
+    const maxAttempts = 10;
+    const poll = setInterval(async () => {
+      attempts++;
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
-      setSearchParams({}, { replace: true });
-    }
+
+      // Check if credits have been updated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: stats } = await supabase.rpc("get_credit_stats", { p_user_id: user.id });
+        const hasCredits = stats && (
+          (plan === "unlimited" && stats.plan === "unlimited") ||
+          (plan !== "unlimited" && (stats.credits_remaining ?? 0) > 0)
+        );
+
+        if (hasCredits || attempts >= maxAttempts) {
+          clearInterval(poll);
+          toast.dismiss(toastId);
+          if (hasCredits) {
+            toast.success(`${planLabels[plan] || "Credits"} added to your account!`);
+          } else {
+            toast.success("Payment received! Credits may take a moment to appear.");
+          }
+          queryClient.invalidateQueries({ queryKey: ["credits"] });
+          queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
+        }
+      } else {
+        clearInterval(poll);
+        toast.dismiss(toastId);
+      }
+    }, 1500);
+
+    return () => clearInterval(poll);
   }, [searchParams, setSearchParams, queryClient]);
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
@@ -134,6 +196,28 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Credit-exhausted nudge */}
+      {!statsLoading && stats?.credits_remaining === 0 && stats?.plan !== "unlimited" && (
+        <div className="flex items-center justify-between gap-4 rounded-card border border-primary/30 bg-primary/5 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <p className="font-body text-sm text-foreground">
+                {stats?.plan === "free"
+                  ? "You've used your free credit! Upgrade to keep building."
+                  : "You're out of credits!"}
+              </p>
+              <p className="font-body text-xs text-muted-foreground mt-0.5">
+                5-Pack: just $9/project (save 31% vs single purchase)
+              </p>
+            </div>
+          </div>
+          <Button variant="amber" size="sm" onClick={() => navigate("/pricing")} className="shrink-0">
+            View Pricing
+          </Button>
+        </div>
+      )}
 
       {/* New project CTA */}
       <button

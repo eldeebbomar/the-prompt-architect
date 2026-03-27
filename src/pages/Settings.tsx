@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Camera, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Camera, Loader2, Gift, Copy, Check, Key, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +14,7 @@ import { useCreditStats } from "@/hooks/use-credits";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 const Settings = () => {
   const { user, profile, signOut } = useAuth();
@@ -25,6 +26,89 @@ const Settings = () => {
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Referral state
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referralCount, setReferralCount] = useState(0);
+  const [codeCopied, setCodeCopied] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("referral_code, referral_count")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setReferralCode(data.referral_code);
+          setReferralCount(data.referral_count ?? 0);
+        }
+      });
+  }, [user]);
+
+  const handleCopyReferral = async () => {
+    if (!referralCode) return;
+    const url = `${window.location.origin}/signup?ref=${referralCode}`;
+    await navigator.clipboard.writeText(url);
+    setCodeCopied(true);
+    toast.success("Referral link copied!");
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  // API key state
+  const [apiKeys, setApiKeys] = useState<{ id: string; key_prefix: string; name: string; created_at: string; last_used_at: string | null }[]>([]);
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
+
+  const isUnlimited = (creditStats?.plan ?? profile?.plan) === "unlimited";
+
+  useEffect(() => {
+    if (!user || !isUnlimited) return;
+    supabase
+      .from("api_keys")
+      .select("id, key_prefix, name, created_at, last_used_at")
+      .eq("user_id", user.id)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data) setApiKeys(data);
+      });
+  }, [user, isUnlimited]);
+
+  const handleCreateApiKey = async () => {
+    setApiKeyLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("manage-api-key", {
+        body: { action: "create", name: newKeyName || "Default" },
+      });
+      if (error) throw error;
+      if (data?.key) {
+        setNewKeyValue(data.key);
+        setApiKeys((prev) => [{ id: data.id || "", key_prefix: data.key_prefix, name: data.name, created_at: new Date().toISOString(), last_used_at: null }, ...prev]);
+        setNewKeyName("");
+        toast.success("API key created. Copy it now — it won't be shown again.");
+      }
+    } catch {
+      toast.error("Failed to create API key.");
+    } finally {
+      setApiKeyLoading(false);
+    }
+  };
+
+  const handleRevokeApiKey = async (keyId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke("manage-api-key", {
+        body: { action: "revoke", key_id: keyId },
+      });
+      if (error) throw error;
+      setApiKeys((prev) => prev.filter((k) => k.id !== keyId));
+      toast.success("API key revoked.");
+    } catch {
+      toast.error("Failed to revoke API key.");
+    }
+  };
 
   // Delete account state
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -109,8 +193,10 @@ const Settings = () => {
       await signOut();
       navigate("/");
       toast.success("Account deleted.");
-    } catch {
-      toast.error("Failed to delete account. Please try again.");
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to delete account. Please try again.");
+      }
     } finally {
       setDeleting(false);
     }
@@ -320,7 +406,189 @@ const Settings = () => {
         {/* Divider */}
         <div className="h-px bg-primary/20" />
 
-        {/* Section 3: Danger Zone */}
+        {/* Section 3: Referral Program */}
+        <section className="space-y-5">
+          <div className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-primary" />
+            <h2 className="font-heading text-[22px] text-foreground">Refer & Earn</h2>
+          </div>
+          <p className="font-body text-sm text-muted-foreground">
+            Share your referral link with friends. When they sign up and create their first project,
+            you both get <span className="font-semibold text-primary">1 free credit</span>.
+          </p>
+
+          {referralCode && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-4 py-2.5 font-mono text-sm text-foreground select-all">
+                  {`${window.location.origin}/signup?ref=${referralCode}`}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                  onClick={handleCopyReferral}
+                >
+                  {codeCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {codeCopied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="rounded-lg border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3">
+                  <p className="font-body text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-0.5">
+                    Your Code
+                  </p>
+                  <p className="font-mono text-sm font-semibold text-primary">{referralCode}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3">
+                  <p className="font-body text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-0.5">
+                    Referrals
+                  </p>
+                  <p className="font-heading text-xl text-foreground">{referralCount}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Divider */}
+        <div className="h-px bg-primary/20" />
+
+        {/* Section 4: API Access */}
+        <section className="space-y-5">
+          <div className="flex items-center gap-2">
+            <Key className="h-5 w-5 text-primary" />
+            <h2 className="font-heading text-[22px] text-foreground">API Access</h2>
+          </div>
+
+          {!isUnlimited ? (
+            <div className="rounded-card border border-border bg-muted/10 p-5 text-center">
+              <p className="font-body text-sm text-muted-foreground">
+                API access is available on the <span className="font-semibold text-primary">Unlimited plan</span>.
+              </p>
+              <Button
+                variant="amber"
+                size="sm"
+                className="mt-3"
+                onClick={() => navigate("/pricing")}
+              >
+                Upgrade to Unlimited
+              </Button>
+            </div>
+          ) : (
+            <>
+              <p className="font-body text-sm text-muted-foreground">
+                Use API keys to access your projects and prompts programmatically.
+              </p>
+
+              {/* New key value (shown once) */}
+              {newKeyValue && (
+                <div className="rounded-card border border-secondary/30 bg-secondary/5 p-4">
+                  <p className="mb-2 font-body text-xs font-medium text-secondary">
+                    Copy your API key now — it won't be shown again:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-3 py-2 font-mono text-xs text-foreground select-all break-all">
+                      {newKeyValue}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(newKeyValue);
+                        toast.success("API key copied!");
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copy
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-xs text-muted-foreground"
+                    onClick={() => setNewKeyValue(null)}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+
+              {/* Create new key */}
+              <div className="flex items-end gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <label className="font-body text-xs font-medium text-muted-foreground">Key Name</label>
+                  <input
+                    type="text"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    placeholder="e.g. CI Pipeline"
+                    className="w-full rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-primary"
+                  />
+                </div>
+                <Button
+                  variant="amber"
+                  size="sm"
+                  onClick={handleCreateApiKey}
+                  disabled={apiKeyLoading}
+                  className="gap-1.5"
+                >
+                  {apiKeyLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Key className="h-3.5 w-3.5" />}
+                  Generate Key
+                </Button>
+              </div>
+
+              {/* Existing keys */}
+              {apiKeys.length > 0 && (
+                <div className="space-y-2">
+                  <p className="font-body text-xs font-medium text-muted-foreground">Active Keys</p>
+                  {apiKeys.map((k) => (
+                    <div
+                      key={k.id || k.key_prefix}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body text-sm text-foreground">{k.name}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{k.key_prefix}</p>
+                      </div>
+                      {k.last_used_at && (
+                        <span className="hidden sm:block font-body text-[10px] text-muted-foreground">
+                          Last used: {new Date(k.last_used_at).toLocaleDateString()}
+                        </span>
+                      )}
+                      {k.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRevokeApiKey(k.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* API docs hint */}
+              <div className="rounded-lg border border-border bg-muted/10 px-4 py-3">
+                <p className="font-body text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Usage:</span>{" "}
+                  <code className="text-primary">curl -H "Authorization: Bearer lp_..." /public-api/projects</code>
+                </p>
+                <p className="mt-1 font-body text-[11px] text-muted-foreground">
+                  Endpoints: <code>GET /projects</code>, <code>GET /projects/:id</code>, <code>GET /projects/:id/prompts</code>
+                </p>
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* Divider */}
+        <div className="h-px bg-primary/20" />
+
+        {/* Section 5: Danger Zone */}
         <section className="space-y-4 pb-10">
           <h2 className="font-heading text-[22px] text-destructive">
             Danger Zone

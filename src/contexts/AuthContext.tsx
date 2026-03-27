@@ -12,6 +12,8 @@ interface Profile {
   plan: string;
   revision_limit: number;
   stripe_customer_id: string | null;
+  payment_failed: boolean;
+  is_admin: boolean;
 }
 
 interface AuthContextValue {
@@ -66,12 +68,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => fetchProfile(newSession.user.id), 0);
         } else {
-          setProfile(null);
-        }
-
-        // Handle session expiry
-        if (event === "SIGNED_OUT" && session !== null) {
-          // Session was active before → user got logged out (expiry or explicit)
           setProfile(null);
         }
 

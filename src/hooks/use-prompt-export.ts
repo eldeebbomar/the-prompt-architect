@@ -43,6 +43,12 @@ export function usePromptExport(projectId: string, prompts: PromptData[], metada
   const totalCount = prompts.length;
   const allCopied = totalCount > 0 && copiedCount >= totalCount;
 
+  const markAllCopied = useCallback(() => {
+    const allIds = new Set(prompts.map((p) => p.id));
+    setCopiedSet(allIds);
+    localStorage.setItem(storageKey, JSON.stringify([...allIds]));
+  }, [prompts, storageKey]);
+
   const copyAll = useCallback(async () => {
     const text = prompts
       .map(
@@ -124,6 +130,7 @@ export function usePromptExport(projectId: string, prompts: PromptData[], metada
     totalCount,
     allCopied,
     markCopied,
+    markAllCopied,
     copyAll,
     downloadMarkdown,
   };

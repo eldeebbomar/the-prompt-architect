@@ -5,3 +5,11 @@ project_id = "gnovkpjawtodjcgizxsh"
     verify_jwt = false
   [functions.stripe-webhook]
     verify_jwt = false
+  [functions.generate-link-code]
+    verify_jwt = false
+  [functions.verify-link-code]
+    verify_jwt = false
+  [functions.extension-api]
+    verify_jwt = false
+  [functions.public-api]
+    verify_jwt = false

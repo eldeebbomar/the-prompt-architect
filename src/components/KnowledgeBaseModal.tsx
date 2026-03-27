@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { Copy, RefreshCw, Info, Pencil, Zap, Loader2 } from "lucide-react";
+import { Copy, RefreshCw, Info, Pencil, Zap, Loader2, AlertTriangle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -14,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 interface KnowledgeBaseModalProps {
   open: boolean;
@@ -48,10 +50,12 @@ const KnowledgeBaseModal = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(kbText);
   const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
 
   const handleGenerate = useCallback(async () => {
     if (!user) return;
     setGenerating(true);
+    setGenError(null);
     try {
       const { data: result, error: invokeError } = await supabase.functions.invoke("generate-prompts", {
         body: { project_id: projectId, type: "knowledge" },
@@ -77,7 +81,12 @@ const KnowledgeBaseModal = ({
       toast.success("Knowledge base generated!");
     } catch (err) {
       console.error("Knowledge base generation error:", err);
-      toast.error("Failed to generate knowledge base. Please try again.");
+      const navFn = (path: string) => { window.location.href = path; };
+      if (!handleWebhookError(err as any, navFn)) {
+        const message = err instanceof Error ? err.message : "Failed to generate knowledge base.";
+        setGenError(message);
+        toast.error("Failed to generate knowledge base. Please try again.");
+      }
     } finally {
       setGenerating(false);
     }
@@ -175,27 +184,56 @@ const KnowledgeBaseModal = ({
                 )}
               </div>
             </>
+          ) : generating ? (
+            <div className="flex-1 space-y-3 py-4">
+              <Skeleton className="h-4 w-3/4 bg-muted" />
+              <Skeleton className="h-4 w-full bg-muted" />
+              <Skeleton className="h-4 w-5/6 bg-muted" />
+              <Skeleton className="h-4 w-full bg-muted" />
+              <Skeleton className="h-4 w-2/3 bg-muted" />
+              <Skeleton className="h-4 w-4/5 bg-muted" />
+              <Skeleton className="h-4 w-full bg-muted" />
+              <Skeleton className="h-4 w-1/2 bg-muted" />
+              <p className="font-body text-xs text-muted-foreground text-center pt-2">
+                Generating knowledge base... this may take a minute.
+              </p>
+            </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center py-12">
-              <div className="text-center space-y-4">
-                <Info className="mx-auto h-10 w-10 text-primary/40" />
-                <p className="font-body text-sm text-muted-foreground">
-                  No knowledge base generated yet.
-                </p>
-                <Button
-                  variant="amber"
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  className="gap-2"
-                >
-                  {generating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
+            <div className="flex-1 flex flex-col items-center justify-center py-12 gap-4">
+              {genError && (
+                <div className="flex items-start gap-3 rounded-card bg-destructive/10 border border-destructive/30 px-4 py-3 w-full">
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-body text-sm text-destructive">{genError}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerate}
+                      className="mt-2 gap-1.5"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Try Again
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!genError && (
+                <div className="text-center space-y-4">
+                  <Info className="mx-auto h-10 w-10 text-primary/40" />
+                  <p className="font-body text-sm text-muted-foreground">
+                    No knowledge base generated yet.
+                  </p>
+                  <Button
+                    variant="amber"
+                    onClick={handleGenerate}
+                    disabled={generating}
+                    className="gap-2"
+                  >
                     <Zap className="h-4 w-4" />
-                  )}
-                  Generate Knowledge Base
-                </Button>
-              </div>
+                    Generate Knowledge Base
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

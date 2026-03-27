@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 import { format } from "date-fns";
 
 const typeBadge: Record<string, string> = {
@@ -46,9 +47,19 @@ const Billing = () => {
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal");
       if (error) throw error;
+      if (data?.error) {
+        if (typeof data.error === "string" && data.error.includes("No active subscription")) {
+          toast.error("No active subscription found. Purchase a plan first.");
+        } else {
+          throw new Error(typeof data.error === "string" ? data.error : "Portal request failed");
+        }
+        return;
+      }
       if (data?.url) window.location.href = data.url;
-    } catch {
-      toast.error("Failed to open billing portal.");
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to open billing portal.");
+      }
     } finally {
       setPortalLoading(false);
     }
@@ -57,6 +68,24 @@ const Billing = () => {
   return (
     <div className="space-y-8">
       <h1 className="font-heading text-[28px] text-foreground">Credits & Billing</h1>
+
+      {/* Payment failed banner */}
+      {profile?.payment_failed && (
+        <div className="rounded-card border border-destructive/30 bg-destructive/5 p-4 flex items-center justify-between gap-4">
+          <p className="font-body text-sm text-destructive">
+            Your last payment failed. Please update your payment method to avoid service interruption.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-destructive/50 text-destructive hover:bg-destructive/10 shrink-0"
+            onClick={handleManageSubscription}
+            disabled={portalLoading}
+          >
+            {portalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Update Payment"}
+          </Button>
+        </div>
+      )}
 
       {/* Section 1 — Credit Balance */}
       <div className="rounded-card border border-border bg-card p-7">

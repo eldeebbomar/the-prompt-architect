@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Loader2, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,15 @@ const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) =>
   const [progress, setProgress] = useState(0);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const loopTimersRef = useRef<{ refreshInterval?: NodeJS.Timeout; finishTimer?: ReturnType<typeof setTimeout> }>({});
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(loopTimersRef.current.refreshInterval);
+      clearTimeout(loopTimersRef.current.finishTimer);
+    };
+  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -50,7 +59,7 @@ const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) =>
       const userId = sessionData?.session?.user?.id;
       if (!userId) throw new Error("Not authenticated");
 
-      const { error } = await supabase.functions.invoke("generate-prompts", {
+      const { data, error } = await supabase.functions.invoke("generate-prompts", {
         body: {
           project_id: projectId,
           user_id: userId,
@@ -63,20 +72,26 @@ const GenerateLoopPromptsCard = ({ projectId }: GenerateLoopPromptsCardProps) =>
         setGenerating(false);
         return;
       }
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       toast.info("Architecting loops... This will take about 30 seconds.");
-      
+
       // Auto-invalidate cache every 10s during generation for a "pop-in" effect
       const refreshInterval = setInterval(() => {
         queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
       }, 10000);
 
       // Finish state after 30s
-      setTimeout(() => {
+      const finishTimer = setTimeout(() => {
         clearInterval(refreshInterval);
         queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
         setGenerating(false);
       }, 31000);
+
+      // Store refs for cleanup
+      loopTimersRef.current = { refreshInterval, finishTimer };
       
     } catch {
       toast.error("Failed to start loop generation. Please try again.");

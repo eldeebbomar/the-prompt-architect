@@ -53,7 +53,9 @@ interface ProjectInfoSidebarProps {
   loading?: boolean;
   onEndDiscovery?: () => void;
   onGeneratePrompts?: () => void;
+  onKeepRefining?: () => void;
   isGenerating?: boolean;
+  pendingComplete?: boolean;
 }
 
 const ProjectInfoSidebar = ({
@@ -62,7 +64,9 @@ const ProjectInfoSidebar = ({
   loading,
   onEndDiscovery,
   onGeneratePrompts,
+  onKeepRefining,
   isGenerating,
+  pendingComplete,
 }: ProjectInfoSidebarProps) => {
   if (loading) {
     return (
@@ -85,8 +89,9 @@ const ProjectInfoSidebar = ({
     ([, v]) => v !== null && v !== undefined && v !== ""
   );
 
+  // Only treat as "fully complete" when user has moved past discovery (generating/ready/completed)
+  // pendingComplete means AI thinks it's done but user hasn't confirmed yet
   const isDiscoveryComplete =
-    specData.is_complete === true ||
     project.status === "generating" ||
     project.status === "ready" ||
     project.status === "completed";
@@ -169,6 +174,11 @@ const ProjectInfoSidebar = ({
             <CheckCircle2 className="h-3 w-3" />
             Spec Ready
           </span>
+        ) : pendingComplete ? (
+          <span className="inline-flex items-center gap-1.5 rounded-button border border-primary/50 bg-primary/10 px-2.5 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wider text-primary">
+            <Sparkles className="h-3 w-3" />
+            Review Ready
+          </span>
         ) : (
           <span className="inline-block rounded-button border border-primary/50 px-2.5 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wider text-primary">
             In Discovery
@@ -176,8 +186,8 @@ const ProjectInfoSidebar = ({
         )}
       </div>
 
-      {/* Phase progress — only show during discovery */}
-      {!isDiscoveryComplete && (
+      {/* Phase progress — show during discovery (not pending) */}
+      {!isDiscoveryComplete && !pendingComplete && (
         <div className="mt-8">
           <p className="mb-3 font-body text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             Discovery Phase
@@ -207,17 +217,17 @@ const ProjectInfoSidebar = ({
         </div>
       )}
 
-      {/* Completed phase dots — all filled when complete */}
-      {isDiscoveryComplete && (
+      {/* Completed phase dots — all filled when complete or pending */}
+      {(isDiscoveryComplete || pendingComplete) && (
         <div className="mt-8">
           <p className="mb-3 font-body text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Discovery Complete
+            {pendingComplete && !isDiscoveryComplete ? "Ready for Review" : "Discovery Complete"}
           </p>
           <div className="flex items-center gap-2">
             {phases.map((phase) => (
               <div key={phase.key} className="flex flex-col items-center gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-[hsl(var(--sage))]" />
-                <span className="font-body text-[9px] text-[hsl(var(--sage))]">
+                <div className={`h-3 w-3 rounded-full ${pendingComplete && !isDiscoveryComplete ? "bg-primary" : "bg-[hsl(var(--sage))]"}`} />
+                <span className={`font-body text-[9px] ${pendingComplete && !isDiscoveryComplete ? "text-primary" : "text-[hsl(var(--sage))]"}`}>
                   {phase.label}
                 </span>
               </div>
@@ -228,7 +238,7 @@ const ProjectInfoSidebar = ({
 
       {/* Spec review */}
       <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-        {isDiscoveryComplete ? renderSpecReview() : (
+        {(isDiscoveryComplete || pendingComplete) ? renderSpecReview() : (
           specEntries.length > 0 && (
             <div className="mt-8">
               <p className="mb-4 font-body text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
@@ -257,6 +267,7 @@ const ProjectInfoSidebar = ({
 
       {/* Action buttons */}
       <div className="mt-auto space-y-3 pt-6 border-t border-primary/10">
+        {/* Post-discovery: user confirmed or status moved past discovery */}
         {isDiscoveryComplete && project.status !== "ready" && project.status !== "completed" && onGeneratePrompts && (
           <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <Button
@@ -268,22 +279,35 @@ const ProjectInfoSidebar = ({
               <Sparkles className="h-4 w-4" />
               Generate My Prompts
             </Button>
-            
+          </div>
+        )}
+
+        {/* Pending complete: AI thinks done, user decides */}
+        {pendingComplete && project.status === "discovery" && onGeneratePrompts && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <Button
+              variant="amber"
+              className="w-full h-12 gap-2 text-sm font-semibold shadow-warm hover:scale-[1.01] active:scale-[0.98] transition-all"
+              onClick={onGeneratePrompts}
+              disabled={isGenerating}
+            >
+              <Sparkles className="h-4 w-4" />
+              Generate My Prompts
+            </Button>
+
             <Button
               variant="outline"
               className="w-full h-11 gap-2 border-primary/20 text-primary hover:bg-primary/5 hover:text-primary font-medium"
-              onClick={() => {
-                const input = document.querySelector('textarea');
-                if (input) input.focus();
-              }}
+              onClick={onKeepRefining}
             >
               <MessageSquare className="h-4 w-4" />
-              Keep Refining
+              Keep Discussing
             </Button>
           </div>
         )}
 
-        {project.status === "discovery" && !isDiscoveryComplete && onEndDiscovery && (
+        {/* Still in discovery, not pending */}
+        {project.status === "discovery" && !pendingComplete && !isDiscoveryComplete && onEndDiscovery && (
           <div className="space-y-3">
              <Button
               variant="outline"

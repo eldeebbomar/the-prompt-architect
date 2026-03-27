@@ -5,7 +5,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute, PublicOnlyRoute, AdminRoute } from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import DashboardLayout from "./components/DashboardLayout";
@@ -25,6 +25,10 @@ const Examples = lazy(() => import("./pages/Examples"));
 const Settings = lazy(() => import("./pages/Settings"));
 const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 const Billing = lazy(() => import("./pages/Billing"));
+const SharedProject = lazy(() => import("./pages/SharedProject"));
+const Help = lazy(() => import("./pages/Help"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -72,6 +76,8 @@ const App = () => (
                     <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/examples" element={<Examples />} />
+                    <Route path="/share/:id" element={<SharedProject />} />
+                    <Route path="/help" element={<Help />} />
                   </Route>
 
                   {/* Dashboard layout with sidebar */}
@@ -84,6 +90,8 @@ const App = () => (
                     <Route path="/dashboard/settings" element={<Settings />} />
                     <Route path="/project/:id" element={<ProjectDetail />} />
                     <Route path="/project/:id/revise" element={<ProjectRevision />} />
+                    <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+                    <Route path="/invite/:token" element={<AcceptInvite />} />
                   </Route>
 
                   <Route path="*" element={<NotFound />} />

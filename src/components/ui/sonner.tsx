@@ -77,9 +77,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
 };
 
 // Wrap toast.error to default to 6s duration
+// Save the original before overwriting — Object.assign mutates in place
+const originalError = sonnerToast.error.bind(sonnerToast);
 const toast = Object.assign(sonnerToast, {
   error: (message: string | React.ReactNode, data?: ExternalToast) =>
-    sonnerToast.error(message, { duration: 6000, ...data }),
+    originalError(message, { duration: 6000, ...data }),
 });
 
 export { Toaster, toast };

@@ -21,16 +21,31 @@ const examplePrompts = [
 ];
 
 const avatars = [
-  "https://i.pravatar.cc/80?img=12",
-  "https://i.pravatar.cc/80?img=32",
-  "https://i.pravatar.cc/80?img=45",
-  "https://i.pravatar.cc/80?img=68",
+  { initials: "JR" },
+  { initials: "AK" },
+  { initials: "TP" },
+  { initials: "ML" },
 ];
 
 const Index = () => {
   return (
     <div className="blueprint-grid" id="main-content">
-      <SEO />
+      <SEO
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "LovPlan",
+          applicationCategory: "DeveloperApplication",
+          operatingSystem: "Web",
+          description: "AI-powered prompt architect for Lovable.dev. Generates 50+ structured prompts from a single conversation.",
+          offers: [
+            { "@type": "Offer", price: "0", priceCurrency: "USD", name: "Free (1 project)" },
+            { "@type": "Offer", price: "12.99", priceCurrency: "USD", name: "Single" },
+            { "@type": "Offer", price: "44.99", priceCurrency: "USD", name: "5-Pack" },
+            { "@type": "Offer", price: "99", priceCurrency: "USD", name: "Unlimited (monthly)" },
+          ],
+        }}
+      />
       {/* Hero — Asymmetric editorial */}
       <section className="container relative flex min-h-[calc(100vh-64px)] flex-col gap-12 pt-20 pb-16 lg:flex-row lg:items-center lg:gap-8 lg:pt-0 lg:pb-0">
         {/* Left column — 55% */}
@@ -91,13 +106,13 @@ const Index = () => {
             style={{ animationDelay: "400ms" }}
           >
             <div className="flex -space-x-2">
-              {avatars.map((src, i) => (
-                <img
+              {avatars.map((a, i) => (
+                <div
                   key={i}
-                  src={src}
-                  alt=""
-                  className="h-8 w-8 rounded-full border-2 border-background object-cover"
-                />
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary/10 font-heading text-xs font-semibold text-primary"
+                >
+                  {a.initials}
+                </div>
               ))}
             </div>
             <p className="font-body text-sm text-muted-foreground">

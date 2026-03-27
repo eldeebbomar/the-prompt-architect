@@ -53,14 +53,32 @@ const ProjectRevision = () => {
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
   const [limitModalOpen, setLimitModalOpen] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
+  const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
 
+  const rateLimitTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const handleRateLimit = useCallback(() => {
     setRateLimited(true);
     setSending(true);
-    setTimeout(() => {
+    setRateLimitCountdown(5);
+    const interval = setInterval(() => {
+      setRateLimitCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    clearTimeout(rateLimitTimerRef.current);
+    rateLimitTimerRef.current = setTimeout(() => {
       setRateLimited(false);
       setSending(false);
     }, 5000);
+  }, []);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => clearTimeout(rateLimitTimerRef.current);
   }, []);
 
   // Revision result for diff panel
@@ -101,20 +119,34 @@ const ProjectRevision = () => {
       return;
     }
 
-    setInput("");
     setSending(true);
-
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
 
+    // Capture snapshot of current prompts for undo BEFORE the revision
+    const snapshot = (prompts ?? []).map((p) => ({
+      id: p.id,
+      title: p.title,
+      prompt_text: p.prompt_text,
+      purpose: p.purpose,
+      category: p.category,
+      sequence_order: p.sequence_order,
+      depends_on: (p.depends_on ?? []) as number[],
+      is_loop: p.is_loop,
+    }));
+    setPreRevisionSnapshot(snapshot);
+    setNewlyInsertedIds([]);
+    const snapshotIdSet = new Set(snapshot.map((p) => p.id));
+
     try {
-      await supabase.from("conversations").insert({
+      const { error: insertError } = await supabase.from("conversations").insert({
         project_id: id,
         role: "user",
         content: text,
         phase: "revision",
       });
+      if (insertError) throw insertError;
 
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       setIsTyping(true);
@@ -225,10 +257,25 @@ const ProjectRevision = () => {
         (deleted_prompt_ids?.length ?? 0);
       toast.success(`${totalChanged} prompt${totalChanged !== 1 ? "s" : ""} updated.`);
 
+      // Clear input only on success so user doesn't lose text on failure
+      setInput("");
+
       // Refetch all data from Supabase (n8n already wrote it)
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       queryClient.invalidateQueries({ queryKey: ["prompts", id] });
       queryClient.invalidateQueries({ queryKey: ["project", id] });
+
+      // Derive newly inserted prompt IDs (for undo) by comparing DB state vs pre-revision snapshot
+      if (new_prompts?.length) {
+        const { data: freshPrompts } = await supabase
+          .from("generated_prompts")
+          .select("id")
+          .eq("project_id", id);
+        const newIds = (freshPrompts ?? [])
+          .map((p) => p.id)
+          .filter((pid) => !snapshotIdSet.has(pid));
+        setNewlyInsertedIds(newIds);
+      }
     } catch {
       setIsTyping(false);
       toast.error("Revision failed. Please try again.");
@@ -318,7 +365,7 @@ const ProjectRevision = () => {
               Revision Limit Reached
             </DialogTitle>
             <DialogDescription className="font-body text-sm text-muted-foreground">
-              You've used your {MAX_FREE_REVISIONS} revisions on this project.
+              You've used your {maxRevisions} revisions on this project.
               Upgrade for unlimited revisions.
             </DialogDescription>
           </DialogHeader>
@@ -360,7 +407,7 @@ const ProjectRevision = () => {
             </h1>
             {!isUnlimited && (
               <span className="font-body text-[10px] text-muted-foreground">
-                {revisionCount}/{MAX_FREE_REVISIONS} revisions used
+                {revisionCount}/{maxRevisions} revisions used
               </span>
             )}
           </div>
@@ -428,8 +475,13 @@ const ProjectRevision = () => {
                   onClick={handleSend}
                   disabled={!input.trim() || sending}
                   className="h-11 w-11 shrink-0 rounded-full"
+                  aria-label="Send revision"
                 >
-                  <Send className="h-4 w-4" />
+                  {rateLimited && rateLimitCountdown > 0 ? (
+                    <span className="font-body text-xs font-semibold">{rateLimitCountdown}s</span>
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
               {atLimit && (

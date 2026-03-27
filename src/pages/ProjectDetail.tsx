@@ -7,7 +7,6 @@ import { useConversations, useProject } from "@/hooks/use-conversations";
 import { UserMessage, AssistantMessage, SystemMessage } from "@/components/ChatMessages";
 import ProjectInfoSidebar from "@/components/ProjectInfoSidebar";
 import TypingIndicator from "@/components/TypingIndicator";
-import GenerationOverlay from "@/components/GenerationOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +34,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
 import PromptViewer from "@/components/PromptViewer";
+import DiscoveryCompleteCard from "@/components/DiscoveryCompleteCard";
 import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 /* ──────── 404 card ──────── */
@@ -113,10 +113,32 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const [infoOpen, setInfoOpen] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationDone, setGenerationDone] = useState(false);
-  const [promptCount, setPromptCount] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false); // guards double-click only
+  const [pendingComplete, setPendingComplete] = useState(false); // AI thinks done, user hasn't confirmed
+  const [completeDismissed, setCompleteDismissed] = useState(false); // user clicked "Keep Discussing"
   const autoSentRef = useRef(false);
+  const generateTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(rateLimitTimerRef.current);
+      clearTimeout(generateTimerRef.current);
+    };
+  }, []);
+
+  // Detect if spec was already marked complete on load (e.g. page refresh)
+  const specCompleteChecked = useRef(false);
+  useEffect(() => {
+    if (specCompleteChecked.current || messagesLoading) return;
+    const specData = typeof project.spec_data === "object" && project.spec_data !== null
+      ? (project.spec_data as Record<string, unknown>)
+      : {};
+    if (specData.is_complete === true && project.status === "discovery" && !completeDismissed) {
+      setPendingComplete(true);
+      specCompleteChecked.current = true;
+    }
+  }, [project.spec_data, project.status, messagesLoading, completeDismissed]);
 
   // Auto-scroll state
   const [userScrolledUp, setUserScrolledUp] = useState(false);
@@ -129,11 +151,24 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const [creditsModalOpen, setCreditsModalOpen] = useState(false);
   // Rate limit cooldown
   const [rateLimited, setRateLimited] = useState(false);
+  const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
 
+  const rateLimitTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const handleRateLimit = useCallback(() => {
     setRateLimited(true);
     setSending(true);
-    setTimeout(() => {
+    setRateLimitCountdown(5);
+    const interval = setInterval(() => {
+      setRateLimitCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    clearTimeout(rateLimitTimerRef.current);
+    rateLimitTimerRef.current = setTimeout(() => {
       setRateLimited(false);
       setSending(false);
     }, 5000);
@@ -172,7 +207,9 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       if (userScrolledUp) {
         setHasNewMessage(true);
       } else {
-        setTimeout(() => scrollToBottom(), 50);
+        const timer = setTimeout(() => scrollToBottom(), 50);
+        prevMessageCount.current = allMessages.length;
+        return () => clearTimeout(timer);
       }
     }
     prevMessageCount.current = allMessages.length;
@@ -181,9 +218,18 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   // Also scroll when typing indicator appears
   useEffect(() => {
     if (isTyping && !userScrolledUp) {
-      setTimeout(() => scrollToBottom(), 50);
+      const timer = setTimeout(() => scrollToBottom(), 50);
+      return () => clearTimeout(timer);
     }
   }, [isTyping, userScrolledUp, scrollToBottom]);
+
+  // Only the last assistant message shows interactive options
+  const lastAssistantMsgId = useMemo(() => {
+    const assistantMsgs = allMessages.filter((m) => m.role === "assistant");
+    return assistantMsgs.length > 0
+      ? assistantMsgs[assistantMsgs.length - 1].id
+      : null;
+  }, [allMessages]);
 
   const currentPhase = useMemo(() => {
     if (!allMessages.length) return 0;
@@ -205,7 +251,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     if (messages && messages.length === 0 && project.description) {
       autoSentRef.current = true;
       setInput(project.description);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const syntheticText = project.description!;
         setInput("");
         setSending(true);
@@ -218,7 +264,8 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
         (async () => {
           try {
-            await supabase.from("conversations").insert({ project_id: id, role: "user", content: syntheticText, phase: "discovery" });
+            const { error: insertError } = await supabase.from("conversations").insert({ project_id: id, role: "user", content: syntheticText, phase: "discovery" });
+            if (insertError) throw insertError;
             setIsTyping(true);
 
             const { data: invokeData, error: invokeError } = await supabase.functions.invoke("discovery-webhook", {
@@ -258,6 +305,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
           setSending(false);
         })();
       }, 100);
+      return () => clearTimeout(timer);
     }
   }, [messages, messagesLoading, project.description, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -272,7 +320,8 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     ]);
 
     try {
-      await supabase.from("conversations").insert({ project_id: id, role: "user", content: text, phase: "discovery" });
+      const { error: insertError } = await supabase.from("conversations").insert({ project_id: id, role: "user", content: text, phase: "discovery" });
+      if (insertError) throw insertError;
       setIsTyping(true);
 
       const { data: invokeData, error: invokeError } = await supabase.functions.invoke("discovery-webhook", {
@@ -299,8 +348,8 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         { id: tempAssistantId, role: "assistant", content: reply, created_at: new Date().toISOString(), phase: phase || "discovery", project_id: id, metadata: {} },
       ]);
 
-      if (is_complete) {
-        toast.success("Discovery complete! Review your spec in the sidebar.");
+      if (is_complete && !completeDismissed) {
+        setPendingComplete(true);
       }
 
       // n8n saves assistant message, spec_data, status, and system messages — just refetch
@@ -338,7 +387,8 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     // Delete this message and all subsequent
     const toDelete = sorted.slice(idx).map((m) => m.id);
     for (const delId of toDelete) {
-      await supabase.from("conversations").delete().eq("id", delId);
+      const { error: delError } = await supabase.from("conversations").delete().eq("id", delId);
+      if (delError) throw delError;
     }
     queryClient.invalidateQueries({ queryKey: ["conversations", id] });
 
@@ -381,9 +431,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const handleClearRestart = async () => {
     setClearDialogOpen(false);
     try {
-      await supabase.from("conversations").delete().eq("project_id", id);
-      await supabase.from("generated_prompts").delete().eq("project_id", id);
-      await supabase.from("projects").update({ status: "discovery", spec_data: {} as Json }).eq("id", id);
+      const { error: e1 } = await supabase.from("conversations").delete().eq("project_id", id);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from("generated_prompts").delete().eq("project_id", id);
+      if (e2) throw e2;
+      const { error: e3 } = await supabase.from("projects").update({ status: "discovery", spec_data: {} as Json }).eq("id", id);
+      if (e3) throw e3;
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       queryClient.invalidateQueries({ queryKey: ["prompts", id] });
       queryClient.invalidateQueries({ queryKey: ["project", id] });
@@ -395,24 +448,39 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     }
   };
 
+  const handleKeepRefining = useCallback(() => {
+    setPendingComplete(false);
+    setCompleteDismissed(true);
+    inputRef.current?.focus();
+  }, []);
+
   const handleEndDiscovery = async () => {
     try {
       // Invoke edge function to end discovery — n8n handles status + system message
-      await supabase.functions.invoke("discovery-webhook", {
+      const { error: invokeError } = await supabase.functions.invoke("discovery-webhook", {
         body: { project_id: id, message: "__END_DISCOVERY__" },
       });
+      if (invokeError) {
+        if (!handleWebhookError(invokeError, navigate)) {
+          toast.error("Failed to end discovery. Please try again.");
+        }
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
-      toast.info("Discovery ended. Review your spec and generate prompts.");
-    } catch {
-      toast.error("Failed to end discovery.");
+      setPendingComplete(true);
+      setCompleteDismissed(false);
+    } catch (err) {
+      if (!handleWebhookError(err, navigate)) {
+        toast.error("Failed to end discovery.");
+      }
     }
   };
 
   const handleGeneratePrompts = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
-    setGenerationDone(false);
+    setPendingComplete(false);
 
     try {
       const { data: invokeData, error: invokeError } = await supabase.functions.invoke("generate-prompts", { body: { project_id: id } });
@@ -421,7 +489,6 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
           throw invokeError;
         }
         setIsGenerating(false);
-        setGenerationDone(false);
         return;
       }
 
@@ -432,23 +499,22 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       toast.info("Prompt generation started in the background.");
 
-      // n8n saves prompts and updates project status — just refetch
-      setTimeout(() => {
+      // n8n saves prompts and updates project status — just refetch after short delay
+      const genTimer = setTimeout(() => {
         setIsGenerating(false);
-        setGenerationDone(false);
         queryClient.invalidateQueries({ queryKey: ["project", id] });
         queryClient.invalidateQueries({ queryKey: ["prompts", id] });
       }, 2000);
+      // Store ref so it can be cleaned up if component unmounts
+      generateTimerRef.current = genTimer;
     } catch {
       setIsGenerating(false);
-      setGenerationDone(false);
       toast.error("Prompt generation failed. Please try again.");
     }
   };
 
   return (
     <>
-      <GenerationOverlay visible={isGenerating} done={generationDone} promptCount={promptCount} />
 
       {/* Clear & Restart confirm dialog */}
       <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
@@ -547,22 +613,40 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                       key={msg.id}
                       content={msg.content}
                       createdAt={msg.created_at}
-                      onOptionClick={(text) => {
-                        const cleanText = text.replace("Select ↵", "").trim();
-                        if (cleanText.toLowerCase().includes("other") || cleanText.toLowerCase().includes("specify")) {
-                          setInput(cleanText);
+                      onOptionClick={msg.id === lastAssistantMsgId ? (text) => {
+                        // text may be a single option or comma-joined multi-select choices
+                        const cleanText = text.trim();
+                        // If the only thing selected is "Other (specify)" alone, populate the input
+                        const parts = cleanText.split(",").map((s) => s.trim());
+                        const isSoleOther =
+                          parts.length === 1 &&
+                          /other.*specify|specify.*other/i.test(parts[0]);
+                        if (isSoleOther) {
+                          setInput("");
                           setTimeout(() => inputRef.current?.focus(), 50);
                         } else {
-                          // Auto send if it's a regular option
                           sendMessage(cleanText);
                         }
-                      }}
+                      } : undefined}
                     />
                   );
                   if (msg.role === "system") return <SystemMessage key={msg.id} content={msg.content} />;
                   return null;
                 })}
                 {isTyping && <TypingIndicator />}
+                {pendingComplete && !isTyping && (
+                  <DiscoveryCompleteCard
+                    specData={
+                      (typeof project.spec_data === "object" && project.spec_data !== null
+                        ? project.spec_data
+                        : {}) as Record<string, unknown>
+                    }
+                    onGeneratePrompts={handleGeneratePrompts}
+                    onKeepRefining={handleKeepRefining}
+                    isGenerating={isGenerating}
+                    accepted={isGenerating}
+                  />
+                )}
               </>
             )}
 
@@ -593,7 +677,11 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                 onInput={(e) => { const t = e.currentTarget; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 128) + "px"; }}
               />
               <Button variant="amber" size="icon" onClick={handleSend} disabled={!input.trim() || sending} className="h-11 w-11 shrink-0 rounded-full" aria-label="Send message">
-                <Send className="h-4 w-4" />
+                {rateLimited && rateLimitCountdown > 0 ? (
+                  <span className="font-body text-xs font-semibold">{rateLimitCountdown}s</span>
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
               <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
                 <SheetTrigger asChild className="lg:hidden">
@@ -603,7 +691,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[300px] border-l-border bg-card p-0">
                   <SheetHeader className="sr-only"><SheetTitle>Project Info</SheetTitle></SheetHeader>
-                  <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} />
+                  <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} pendingComplete={pendingComplete} onKeepRefining={handleKeepRefining} />
                 </SheetContent>
               </Sheet>
             </div>
@@ -611,7 +699,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         </div>
 
         <aside className="hidden w-[320px] shrink-0 border-l border-border bg-card lg:block overflow-y-auto">
-          <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} />
+          <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} pendingComplete={pendingComplete} onKeepRefining={handleKeepRefining} />
         </aside>
       </div>
     </>

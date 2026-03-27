@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Compass, MoreVertical, Trash2 } from "lucide-react";
+import { Plus, Compass, MoreVertical, Trash2, Copy, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/hooks/use-projects";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -59,6 +60,7 @@ const MyProjects = () => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (!projects) return [];
@@ -89,6 +91,34 @@ const MyProjects = () => {
       toast.success("Project deleted.");
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["project-count"] });
+    }
+  };
+
+  const handleDuplicate = async (projectId: string) => {
+    if (duplicating) return; // Prevent concurrent duplications
+    setDuplicating(projectId);
+    try {
+      const { data, error } = await supabase.functions.invoke("duplicate-project", {
+        body: { project_id: projectId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success("Project duplicated! 1 credit used.");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project-count"] });
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
+
+      if (data?.project?.id) {
+        navigate(`/project/${data.project.id}`);
+      }
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to duplicate project.");
+      }
+    } finally {
+      setDuplicating(null);
     }
   };
 
@@ -181,6 +211,18 @@ const MyProjects = () => {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-border">
+                        <DropdownMenuItem
+                          className="gap-2"
+                          disabled={duplicating === project.id}
+                          onClick={(e) => { e.stopPropagation(); handleDuplicate(project.id); }}
+                        >
+                          {duplicating === project.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                          Duplicate
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="gap-2 text-destructive focus:text-destructive"
                           onClick={(e) => { e.stopPropagation(); setDeleteId(project.id); }}

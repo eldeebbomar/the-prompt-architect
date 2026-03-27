@@ -1,4 +1,9 @@
-import { RefreshCw, Lightbulb } from "lucide-react";
+import { RefreshCw, Lightbulb, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const LoopPromptHeader = () => (
   <div className="border-b border-border px-4 py-4 space-y-3">
@@ -7,6 +12,17 @@ const LoopPromptHeader = () => (
       <h2 className="font-heading text-xl text-foreground">
         Loop Prompts — Self-Healing Audit
       </h2>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent side="right" className="max-w-[260px]">
+          <p className="text-xs">
+            Loop prompts tell Lovable to audit and fix its own code after the
+            main build completes. Run each one the recommended number of times.
+          </p>
+        </TooltipContent>
+      </Tooltip>
     </div>
     <p className="font-body text-xs text-muted-foreground">
       Run these AFTER you've queued all main prompts. Each one tells Lovable to

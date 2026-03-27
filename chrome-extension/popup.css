@@ -1,0 +1,376 @@
+/* LovPlan Deployer — Popup Styles */
+
+:root {
+  --bg: #0f0f0f;
+  --card: #1a1a1a;
+  --border: #2a2a2a;
+  --text: #e5e5e5;
+  --text-muted: #888;
+  --primary: #d4a017;
+  --primary-hover: #e6b52a;
+  --primary-bg: rgba(212, 160, 23, 0.1);
+  --danger: #e05555;
+  --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 360px;
+  min-height: 200px;
+  max-height: 520px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  overflow-y: auto;
+}
+
+.screen { padding: 20px; }
+.hidden { display: none !important; }
+
+/* Header / Logo */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+.header h1 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* Code inputs */
+.code-inputs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.code-inputs input {
+  width: 40px;
+  height: 48px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: monospace;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.code-inputs input:focus {
+  border-color: var(--primary);
+}
+
+/* Buttons */
+.btn-primary {
+  width: 100%;
+  padding: 10px;
+  background: var(--primary);
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 12px;
+  padding: 0;
+}
+.btn-back:hover { color: var(--text); }
+
+/* Errors */
+.error {
+  color: var(--danger);
+  font-size: 11px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.help-text {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+  margin-top: 16px;
+}
+.help-text a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.help-text a:hover { text-decoration: underline; }
+
+/* User bar */
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.user-email {
+  font-size: 12px;
+  color: var(--text);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--primary-bg);
+  color: var(--primary);
+  border: 1px solid rgba(212, 160, 23, 0.3);
+}
+
+/* Project list */
+h2 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.project-card {
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.project-card:hover {
+  border-color: var(--primary);
+}
+.project-name {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.project-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 10px;
+}
+.status-pill {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 99px;
+  border: 1px solid;
+}
+.status-ready { border-color: #4ade80; color: #4ade80; }
+.status-completed { border-color: var(--text-muted); color: var(--text-muted); }
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px 0;
+  font-size: 12px;
+}
+
+/* Prompt list */
+.prompt-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prompt-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.prompt-seq {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.prompt-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.loop-badge {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  flex-shrink: 0;
+}
+
+/* Resume banner */
+.resume-banner {
+  padding: 10px 12px;
+  background: var(--primary-bg);
+  border: 1px solid rgba(212, 160, 23, 0.3);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--text);
+}
+.resume-banner .btn-sm {
+  padding: 4px 10px;
+  font-size: 10px;
+}
+
+/* Deploy bar */
+.deploy-bar {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.btn-deploy { margin-bottom: 4px; }
+.deploy-note {
+  font-size: 10px;
+  color: var(--danger);
+  text-align: center;
+}
+
+/* Progress */
+.progress-bar {
+  height: 6px;
+  background: var(--card);
+  border-radius: 3px;
+  margin: 16px 0;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  transition: width 0.3s ease;
+  border-radius: 3px;
+}
+.deploy-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+/* Deploy action buttons (pause + cancel side by side) */
+.deploy-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.deploy-actions .btn-ghost {
+  flex: 1;
+}
+.deploy-actions .btn-cancel {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.deploy-actions .btn-cancel:hover {
+  background: rgba(224, 85, 85, 0.1);
+}
+
+/* Complete */
+.complete-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin: 0 auto 12px;
+}
+
+/* Spinner */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 20px auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

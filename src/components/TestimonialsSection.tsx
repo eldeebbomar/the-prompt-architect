@@ -4,21 +4,21 @@ const testimonials = [
   {
     name: "Sarah K.",
     handle: "@sarahbuilds",
-    avatar: "https://i.pravatar.cc/96?img=26",
+    initials: "SK",
     quote:
       "I used to spend 3 hours writing prompts for a Lovable project. LovPlan generated better prompts in 8 minutes. My last app had zero broken components on first build.",
   },
   {
     name: "Marcus T.",
     handle: "@marcusmakes",
-    avatar: "https://i.pravatar.cc/96?img=53",
+    initials: "MT",
     quote:
       "The dependency ordering is what sold me. Every prompt references what came before it. Lovable actually understands the full picture instead of building in isolation.",
   },
   {
     name: "Emma L.",
     handle: "@emmaships",
-    avatar: "https://i.pravatar.cc/96?img=47",
+    initials: "EL",
     quote:
       "The loop prompts are genius. I queue them after the main build and Lovable fixes its own bugs. Saved me an entire day of debugging last week.",
   },
@@ -55,11 +55,9 @@ const TestimonialsSection = () => {
 
               {/* Avatar + info */}
               <div className="mb-5 flex items-center gap-3 pt-6">
-                <img
-                  src={t.avatar}
-                  alt={t.name}
-                  className="h-12 w-12 rounded-full border-2 border-primary object-cover"
-                />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-primary/10">
+                  <span className="font-heading text-sm font-bold text-primary">{t.initials}</span>
+                </div>
                 <div>
                   <p className="font-body text-sm font-medium text-foreground">{t.name}</p>
                   <p className="font-body text-xs text-muted-foreground">{t.handle}</p>

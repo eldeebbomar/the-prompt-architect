@@ -1,20 +1,28 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const PRICE_CONFIG: Record<string, { price_id: string; credits: number; mode: "payment" | "subscription" }> = {
-  single: { price_id: "price_1TD89gAMqigyfbFwhuc7nZlL", credits: 1, mode: "payment" },
-  pack:   { price_id: "price_1TD89hAMqigyfbFwupDmfPeo", credits: 5, mode: "payment" },
-  unlimited: { price_id: "price_1TD89iAMqigyfbFwytSYJiUO", credits: 0, mode: "subscription" },
+  single: {
+    price_id: Deno.env.get("STRIPE_PRICE_SINGLE") || "price_1TD89gAMqigyfbFwhuc7nZlL",
+    credits: 1,
+    mode: "payment",
+  },
+  pack: {
+    price_id: Deno.env.get("STRIPE_PRICE_PACK") || "price_1TD89hAMqigyfbFwupDmfPeo",
+    credits: 5,
+    mode: "payment",
+  },
+  unlimited: {
+    price_id: Deno.env.get("STRIPE_PRICE_UNLIMITED") || "price_1TD89iAMqigyfbFwytSYJiUO",
+    credits: 0,
+    mode: "subscription",
+  },
 };
 
 serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

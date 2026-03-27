@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import ScrollReveal from "@/components/ScrollReveal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 const plans = [
   {
@@ -74,6 +75,7 @@ const plans = [
 
 const PricingSection = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState<string | null>(null);
 
   const priceTypeMap: Record<string, string> = {
@@ -98,12 +100,15 @@ const PricingSection = () => {
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       if (data?.url) {
         window.location.href = data.url;
       }
     } catch (err) {
       console.error("Checkout error:", err);
-      toast.error("Failed to start checkout. Please try again.");
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to start checkout. Please try again.");
+      }
     } finally {
       setLoading(null);
     }
