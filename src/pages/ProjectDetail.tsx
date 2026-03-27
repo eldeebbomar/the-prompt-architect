@@ -42,41 +42,90 @@ const ProjectNotFound = () => (
 );
 
 /* ──────── Generating view ──────── */
-const GeneratingView = ({ projectName }: { projectName: string }) => (
-  <div className="flex h-[calc(100vh-64px)] items-center justify-center">
-    <div className="max-w-md text-center space-y-6">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-      <div>
-        <h2 className="font-heading text-2xl text-foreground">Generating your prompts…</h2>
-        <p className="mt-2 font-body text-sm text-muted-foreground">
-          Building a custom prompt blueprint for <span className="text-foreground">{projectName}</span>. This usually
-          takes 30–50 seconds.
-        </p>
-      </div>
-      <div className="mx-auto max-w-xs space-y-2.5">
-        {[
-          "Analyzing your spec…",
-          "Building infrastructure prompts…",
-          "Creating feature prompts…",
-          "Generating backend prompts…",
-          "Adding polish & loop prompts…",
-        ].map((step, i) => (
-          <div
-            key={step}
-            className="flex items-center gap-2.5 font-body text-xs text-muted-foreground animate-fade-in"
-            style={{ animationDelay: `${i * 3}s` }}
-          >
-            <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse" />
-            {step}
+const GeneratingView = ({ projectName, projectId }: { projectName: string; projectId: string }) => {
+  const [showRetry, setShowRetry] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowRetry(true), 60000); // show after 60s
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      // Delete existing prompts and reset to discovery, then re-trigger generation
+      await supabase.from("generated_prompts").delete().eq("project_id", projectId);
+      const { error: invokeError } = await supabase.functions.invoke("generate-prompts", {
+        body: { project_id: projectId },
+      });
+      if (invokeError) throw invokeError;
+      await supabase.from("projects").update({ status: "generating" }).eq("id", projectId);
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["prompts", projectId] });
+      setShowRetry(false);
+      toast.info("Regenerating prompts…");
+    } catch {
+      toast.error("Retry failed. Please try again.");
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  return (
+    <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+      <div className="max-w-md text-center space-y-6">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+        <div>
+          <h2 className="font-heading text-2xl text-foreground">Generating your prompts…</h2>
+          <p className="mt-2 font-body text-sm text-muted-foreground">
+            Building a custom prompt blueprint for <span className="text-foreground">{projectName}</span>. This usually
+            takes 15–30 seconds.
+          </p>
+        </div>
+        <div className="mx-auto max-w-xs space-y-2.5">
+          {[
+            "Analyzing your spec…",
+            "Building infrastructure prompts…",
+            "Creating feature prompts…",
+            "Generating backend prompts…",
+            "Adding polish & loop prompts…",
+          ].map((step, i) => (
+            <div
+              key={step}
+              className="flex items-center gap-2.5 font-body text-xs text-muted-foreground animate-fade-in"
+              style={{ animationDelay: `${i * 3}s` }}
+            >
+              <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse" />
+              {step}
+            </div>
+          ))}
+        </div>
+        {showRetry && (
+          <div className="pt-4 space-y-2 animate-fade-in">
+            <p className="font-body text-xs text-muted-foreground">
+              Taking longer than expected?
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleRetry}
+              disabled={retrying}
+            >
+              {retrying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+              Retry Generation
+            </Button>
           </div>
-        ))}
+        )}
       </div>
     </div>
-  </div>
-);
-
+  );
+};
 /* ──────── Discovery Chat ──────── */
 
 interface OptimisticMessage {
@@ -842,7 +891,7 @@ const ProjectDetail = () => {
     case "discovery":
       return <DiscoveryChat project={activeProject} />;
     case "generating":
-      return <GeneratingView projectName={activeProject.name} />;
+      return <GeneratingView projectName={activeProject.name} projectId={activeProject.id} />;
     case "ready":
     case "completed":
     case "revising":
