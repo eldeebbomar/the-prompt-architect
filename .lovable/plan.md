@@ -1,36 +1,42 @@
 
+Goal
+- Restore app loading on `lovplan.com` by fixing the runtime crash that happens before React mounts.
 
-## Goal
-Fix the blank published site by ensuring the production build succeeds and serves the full app.
+What I found
+- The domain now serves JS/CSS assets (so publish/build is no longer the blocker).
+- Browser console shows a hard crash:
+  - `Missing required env vars: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY must be set.`
+- This error comes from `src/integrations/supabase/client.ts`, which throws immediately if env vars are absent.
+- Result: app renders blank because startup stops before `App` mounts.
 
-## Diagnosis
-- Both `lovplan.com` and `blueprint-prompt-builder.lovable.app` serve an empty HTML shell: `<div id="root"></div>` with no script tags, no head content
-- The preview works perfectly, so the source code is valid
-- This indicates the production build artifact is empty or the publish pipeline failed silently
+Implementation plan
+1) Make Supabase client startup resilient in production
+- Update `src/integrations/supabase/client.ts` to:
+  - Read env vars as today.
+  - Add safe fallback values for this project’s Supabase URL + anon key when env vars are missing.
+  - Keep a guard that throws only if both env and fallback are unavailable.
+  - Add a warning log when fallback is used (for visibility).
 
-## Root Cause (likely)
-The `manualChunks` configuration in `vite.config.ts` can cause production builds to fail if any referenced package isn't resolvable at build time. The Lovable publish pipeline may swallow this error and deploy the fallback HTML.
+2) Keep behavior secure and unchanged
+- Use only Supabase **anon/publishable** key (never service role key).
+- Do not change auth logic, routing, or API behavior.
 
-## Fix
+3) Improve maintainability
+- Update `.env.example` comments to clarify:
+  - Env vars are preferred.
+  - Fallback exists to prevent production blank-page failures if publish env injection fails.
 
-### Step 1: Simplify vite.config.ts build config
-Remove the `manualChunks` configuration that may be causing the production build to fail silently:
+4) Verify end-to-end after publish update
+- Open `https://lovplan.com` and confirm no startup env error in console.
+- Confirm homepage renders (not blank).
+- Confirm auth + profile bootstrap works (e.g., `profiles` request succeeds).
+- Spot-check `/signup`, `/login`, `/dashboard` route loading.
 
-```typescript
-// Remove the rollupOptions.output.manualChunks block entirely
-build: {
-  sourcemap: mode === "production" ? "hidden" : true,
-},
-```
-
-### Step 2: Republish
-After the change, republish the project to trigger a fresh build.
-
-## Why this works
-- `manualChunks` requires all listed packages to be resolvable during the Rollup bundling phase
-- If any package (e.g., a specific Radix UI component) has a different import path or isn't installed, the build fails
-- Removing it lets Vite handle code splitting automatically, which is sufficient for this app size
-
-## Files changed
-- `vite.config.ts` — remove `rollupOptions` block
-
+Technical details
+- File to change:
+  - `src/integrations/supabase/client.ts` (primary fix)
+  - `.env.example` (documentation clarity)
+- Root cause category:
+  - Frontend runtime initialization failure due to strict env-only bootstrapping.
+- Why this fix:
+  - It removes the single-point-of-failure causing white screen while preserving existing Supabase architecture.
