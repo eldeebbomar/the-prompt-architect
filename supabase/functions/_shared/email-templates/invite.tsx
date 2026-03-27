@@ -20,7 +20,11 @@ interface InviteEmailProps {
   confirmationUrl: string
 }
 
-export const InviteEmail = ({ siteName, siteUrl, confirmationUrl }: InviteEmailProps) => (
+export const InviteEmail = ({
+  siteName,
+  siteUrl,
+  confirmationUrl,
+}: InviteEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>You've been invited to join LovPlan</Preview>
@@ -30,8 +34,10 @@ export const InviteEmail = ({ siteName, siteUrl, confirmationUrl }: InviteEmailP
         <Heading style={h1}>You've been invited</Heading>
         <Text style={text}>
           You've been invited to join{' '}
-          <Link href={siteUrl} style={link}><strong>LovPlan</strong></Link>.
-          Click the button below to accept the invitation.
+          <Link href={siteUrl} style={link}>
+            <strong>LovPlan</strong>
+          </Link>
+          . Click the button below to accept the invitation and create your account.
         </Text>
         <Button style={button} href={confirmationUrl}>
           Accept Invitation
