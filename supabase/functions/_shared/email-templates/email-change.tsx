@@ -31,8 +31,7 @@ export const EmailChangeEmail = ({ siteName, email, newEmail, confirmationUrl }:
         <Heading style={h1}>Confirm your email change</Heading>
         <Text style={text}>
           You requested to change your email address from{' '}
-          <Link href={`mailto:${email}`} style={link}>{email}</Link>{' '}
-          to{' '}
+          <Link href={`mailto:${email}`} style={link}>{email}</Link> to{' '}
           <Link href={`mailto:${newEmail}`} style={link}>{newEmail}</Link>.
         </Text>
         <Button style={button} href={confirmationUrl}>

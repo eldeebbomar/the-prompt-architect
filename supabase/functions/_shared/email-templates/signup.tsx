@@ -21,20 +21,32 @@ interface SignupEmailProps {
   confirmationUrl: string
 }
 
-export const SignupEmail = ({ siteName, siteUrl, recipient, confirmationUrl }: SignupEmailProps) => (
+export const SignupEmail = ({
+  siteName,
+  siteUrl,
+  recipient,
+  confirmationUrl,
+}: SignupEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Confirm your email for LovPlan</Preview>
+    <Preview>Welcome aboard — confirm your email for LovPlan</Preview>
     <Body style={main}>
       <Container style={container}>
         <Text style={logo}>LovPlan</Text>
-        <Heading style={h1}>Welcome aboard!</Heading>
+        <Heading style={h1}>Welcome aboard</Heading>
         <Text style={text}>
           Thanks for signing up for{' '}
-          <Link href={siteUrl} style={link}><strong>{siteName}</strong></Link>!
+          <Link href={siteUrl} style={link}>
+            <strong>LovPlan</strong>
+          </Link>
+          ! We're excited to have you.
+        </Text>
+        <Text style={text}>
           Please confirm your email address (
-          <Link href={`mailto:${recipient}`} style={link}>{recipient}</Link>
-          ) to get started.
+          <Link href={`mailto:${recipient}`} style={link}>
+            {recipient}
+          </Link>
+          ) by clicking the button below:
         </Text>
         <Button style={button} href={confirmationUrl}>
           Confirm Email
