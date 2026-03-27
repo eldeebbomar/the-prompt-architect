@@ -32,7 +32,7 @@ const stats = [
 
 const TestimonialsSection = () => {
   return (
-    <section className="container py-24">
+    <section className="container pt-24 pb-12">
       {/* Header */}
       <ScrollReveal className="mx-auto max-w-2xl text-center">
         <p className="mb-4 font-body text-xs font-medium uppercase tracking-[0.15em] text-primary">
