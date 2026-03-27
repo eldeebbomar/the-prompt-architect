@@ -32,7 +32,8 @@ export const SignupEmail = ({
     <Preview>Confirm your email for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Confirm your email</Heading>
+        <Text style={logo}>LovPlan</Text>
+        <Heading style={h1}>Welcome aboard!</Heading>
         <Text style={text}>
           Thanks for signing up for{' '}
           <Link href={siteUrl} style={link}>
