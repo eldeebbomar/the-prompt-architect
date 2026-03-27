@@ -39,14 +39,11 @@ export const SignupEmail = ({
           <Link href={siteUrl} style={link}>
             <strong>LovPlan</strong>
           </Link>
-          ! We're excited to have you.
-        </Text>
-        <Text style={text}>
-          Please confirm your email address (
+          ! Confirm your email address (
           <Link href={`mailto:${recipient}`} style={link}>
             {recipient}
           </Link>
-          ) by clicking the button below:
+          ) to get started.
         </Text>
         <Button style={button} href={confirmationUrl}>
           Confirm Email

@@ -30,10 +30,10 @@ export const MagicLinkEmail = ({
         <Text style={logo}>LovPlan</Text>
         <Heading style={h1}>Your login link</Heading>
         <Text style={text}>
-          Click the button below to sign in to LovPlan. This link will expire shortly.
+          Click the button below to log in to LovPlan. This link will expire shortly.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Sign In
+          Log In
         </Button>
         <Text style={footer}>
           If you didn't request this link, you can safely ignore this email.
