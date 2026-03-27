@@ -100,6 +100,76 @@ export type Database = {
           },
         ]
       }
+      extension_link_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          used?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extension_link_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extension_sessions: {
+        Row: {
+          created_at: string
+          device_name: string
+          id: string
+          last_used_at: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_name?: string
+          id?: string
+          last_used_at?: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_name?: string
+          id?: string
+          last_used_at?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extension_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_prompts: {
         Row: {
           category: string
@@ -185,6 +255,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          payment_failed: boolean
           plan: string
           revision_limit: number | null
           stripe_customer_id: string | null
@@ -198,6 +269,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          payment_failed?: boolean
           plan?: string
           revision_limit?: number | null
           stripe_customer_id?: string | null
@@ -211,6 +283,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          payment_failed?: boolean
           plan?: string
           revision_limit?: number | null
           stripe_customer_id?: string | null
