@@ -26,11 +26,11 @@ const Admin = () => {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_admin_stats", {
+      const { data, error } = await (supabase.rpc as any)("get_admin_stats", {
         p_user_id: user!.id,
       });
       if (error) throw error;
-      if (data?.error === "forbidden") throw new Error("Forbidden");
+      if ((data as any)?.error === "forbidden") throw new Error("Forbidden");
       return data as {
         total_users: number;
         total_projects: number;

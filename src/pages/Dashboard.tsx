@@ -82,9 +82,10 @@ const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: stats } = await supabase.rpc("get_credit_stats", { p_user_id: user.id });
-        const hasCredits = stats && (
-          (plan === "unlimited" && stats.plan === "unlimited") ||
-          (plan !== "unlimited" && (stats.credits_remaining ?? 0) > 0)
+        const s = stats as any;
+        const hasCredits = s && (
+          (plan === "unlimited" && s.plan === "unlimited") ||
+          (plan !== "unlimited" && (s.credits_remaining ?? 0) > 0)
         );
 
         if (hasCredits || attempts >= maxAttempts) {
