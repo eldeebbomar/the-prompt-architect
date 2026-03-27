@@ -16,7 +16,7 @@ export function useExtensionSessions() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("extension_sessions")
         .select("id, device_name, created_at, last_used_at")
         .order("last_used_at", { ascending: false });
@@ -32,7 +32,7 @@ export function useRevokeSession() {
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("extension_sessions")
         .delete()
         .eq("id", sessionId);
@@ -52,7 +52,7 @@ export function useRevokeAllSessions() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("extension_sessions")
         .delete()
         .eq("user_id", user.id);

@@ -132,12 +132,12 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
 
   // Fetch current sharing state
   useEffect(() => {
-    supabase
+    (supabase as any)
       .from("projects")
       .select("is_public")
       .eq("id", projectId)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data) setIsPublic(!!data.is_public);
       });
   }, [projectId]);
@@ -145,7 +145,7 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
   const handleToggleShare = useCallback(async () => {
     setSharingLoading(true);
     const newVal = !isPublic;
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("projects")
       .update({ is_public: newVal })
       .eq("id", projectId);

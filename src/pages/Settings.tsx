@@ -34,12 +34,12 @@ const Settings = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase
+    (supabase as any)
       .from("profiles")
       .select("referral_code, referral_count")
       .eq("id", user.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data) {
           setReferralCode(data.referral_code);
           setReferralCount(data.referral_count ?? 0);
@@ -66,13 +66,13 @@ const Settings = () => {
 
   useEffect(() => {
     if (!user || !isUnlimited) return;
-    supabase
+    (supabase as any)
       .from("api_keys")
       .select("id, key_prefix, name, created_at, last_used_at")
       .eq("user_id", user.id)
       .is("revoked_at", null)
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data) setApiKeys(data);
       });
   }, [user, isUnlimited]);

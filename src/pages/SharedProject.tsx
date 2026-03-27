@@ -22,7 +22,7 @@ const SharedProject = () => {
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ["shared-project", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("projects")
         .select("id, name, description, status, created_at, is_public")
         .eq("id", id!)
