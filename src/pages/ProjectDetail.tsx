@@ -9,13 +9,7 @@ import ProjectInfoSidebar from "@/components/ProjectInfoSidebar";
 import TypingIndicator from "@/components/TypingIndicator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,13 +17,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Json } from "@/integrations/supabase/types";
@@ -43,9 +31,7 @@ const ProjectNotFound = () => (
     <div className="max-w-sm rounded-card border border-border bg-card p-10 text-center">
       <FolderOpen className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
       <h2 className="font-heading text-xl text-foreground">Project not found</h2>
-      <p className="mt-2 font-body text-sm text-muted-foreground">
-        This project may have been deleted.
-      </p>
+      <p className="mt-2 font-body text-sm text-muted-foreground">This project may have been deleted.</p>
       <Link to="/dashboard">
         <Button variant="amber" className="mt-6">
           Back to Dashboard
@@ -65,7 +51,8 @@ const GeneratingView = ({ projectName }: { projectName: string }) => (
       <div>
         <h2 className="font-heading text-2xl text-foreground">Generating your prompts…</h2>
         <p className="mt-2 font-body text-sm text-muted-foreground">
-          Building a custom prompt blueprint for <span className="text-foreground">{projectName}</span>. This usually takes 15–30 seconds.
+          Building a custom prompt blueprint for <span className="text-foreground">{projectName}</span>. This usually
+          takes 30–50 seconds.
         </p>
       </div>
       <div className="mx-auto max-w-xs space-y-2.5">
@@ -76,7 +63,11 @@ const GeneratingView = ({ projectName }: { projectName: string }) => (
           "Generating backend prompts…",
           "Adding polish & loop prompts…",
         ].map((step, i) => (
-          <div key={step} className="flex items-center gap-2.5 font-body text-xs text-muted-foreground animate-fade-in" style={{ animationDelay: `${i * 3}s` }}>
+          <div
+            key={step}
+            className="flex items-center gap-2.5 font-body text-xs text-muted-foreground animate-fade-in"
+            style={{ animationDelay: `${i * 3}s` }}
+          >
             <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse" />
             {step}
           </div>
@@ -131,9 +122,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const specCompleteChecked = useRef(false);
   useEffect(() => {
     if (specCompleteChecked.current || messagesLoading) return;
-    const specData = typeof project.spec_data === "object" && project.spec_data !== null
-      ? (project.spec_data as Record<string, unknown>)
-      : {};
+    const specData =
+      typeof project.spec_data === "object" && project.spec_data !== null
+        ? (project.spec_data as Record<string, unknown>)
+        : {};
     if (specData.is_complete === true && project.status === "discovery" && !completeDismissed) {
       setPendingComplete(true);
       specCompleteChecked.current = true;
@@ -180,7 +172,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     // Match by content+role to catch optimistic messages that now exist in DB with different IDs
     const realContentKeys = new Set(real.map((m) => `${m.role}::${m.content}`));
     const extras = optimisticMessages.filter(
-      (m) => !realIds.has(m.id) && !realContentKeys.has(`${m.role}::${m.content}`)
+      (m) => !realIds.has(m.id) && !realContentKeys.has(`${m.role}::${m.content}`),
     );
     return [...real, ...extras];
   }, [messages, optimisticMessages]);
@@ -226,9 +218,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   // Only the last assistant message shows interactive options
   const lastAssistantMsgId = useMemo(() => {
     const assistantMsgs = allMessages.filter((m) => m.role === "assistant");
-    return assistantMsgs.length > 0
-      ? assistantMsgs[assistantMsgs.length - 1].id
-      : null;
+    return assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1].id : null;
   }, [allMessages]);
 
   const currentPhase = useMemo(() => {
@@ -259,12 +249,22 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         const tempId = `opt-${Date.now()}`;
         setOptimisticMessages((prev) => [
           ...prev,
-          { id: tempId, role: "user", content: syntheticText, created_at: new Date().toISOString(), phase: "discovery", project_id: id, metadata: {} },
+          {
+            id: tempId,
+            role: "user",
+            content: syntheticText,
+            created_at: new Date().toISOString(),
+            phase: "discovery",
+            project_id: id,
+            metadata: {},
+          },
         ]);
 
         (async () => {
           try {
-            const { error: insertError } = await supabase.from("conversations").insert({ project_id: id, role: "user", content: syntheticText, phase: "discovery" });
+            const { error: insertError } = await supabase
+              .from("conversations")
+              .insert({ project_id: id, role: "user", content: syntheticText, phase: "discovery" });
             if (insertError) throw insertError;
             setIsTyping(true);
 
@@ -283,14 +283,25 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             }
 
             const { reply, phase: respPhase } = invokeData as {
-              reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
+              reply: string;
+              phase: string;
+              is_complete: boolean;
+              spec_data?: Record<string, string | number | boolean | null>;
             };
 
             // Display reply optimistically
             const tempAssistantId = `opt-assistant-${Date.now()}`;
             setOptimisticMessages((prev) => [
               ...prev,
-              { id: tempAssistantId, role: "assistant", content: reply, created_at: new Date().toISOString(), phase: respPhase || "discovery", project_id: id, metadata: {} },
+              {
+                id: tempAssistantId,
+                role: "assistant",
+                content: reply,
+                created_at: new Date().toISOString(),
+                phase: respPhase || "discovery",
+                project_id: id,
+                metadata: {},
+              },
             ]);
 
             // n8n saves assistant message, spec_data, and status — just refetch
@@ -316,11 +327,21 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     const tempId = `opt-${Date.now()}`;
     setOptimisticMessages((prev) => [
       ...prev,
-      { id: tempId, role: "user", content: text, created_at: new Date().toISOString(), phase: "discovery", project_id: id, metadata: {} },
+      {
+        id: tempId,
+        role: "user",
+        content: text,
+        created_at: new Date().toISOString(),
+        phase: "discovery",
+        project_id: id,
+        metadata: {},
+      },
     ]);
 
     try {
-      const { error: insertError } = await supabase.from("conversations").insert({ project_id: id, role: "user", content: text, phase: "discovery" });
+      const { error: insertError } = await supabase
+        .from("conversations")
+        .insert({ project_id: id, role: "user", content: text, phase: "discovery" });
       if (insertError) throw insertError;
       setIsTyping(true);
 
@@ -338,14 +359,25 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       }
 
       const { reply, phase, is_complete } = invokeData as {
-        reply: string; phase: string; is_complete: boolean; spec_data?: Record<string, string | number | boolean | null>;
+        reply: string;
+        phase: string;
+        is_complete: boolean;
+        spec_data?: Record<string, string | number | boolean | null>;
       };
 
       // Display reply optimistically
       const tempAssistantId = `opt-assistant-${Date.now()}`;
       setOptimisticMessages((prev) => [
         ...prev,
-        { id: tempAssistantId, role: "assistant", content: reply, created_at: new Date().toISOString(), phase: phase || "discovery", project_id: id, metadata: {} },
+        {
+          id: tempAssistantId,
+          role: "assistant",
+          content: reply,
+          created_at: new Date().toISOString(),
+          phase: phase || "discovery",
+          project_id: id,
+          metadata: {},
+        },
       ]);
 
       if (is_complete && !completeDismissed) {
@@ -375,12 +407,17 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   // Edit message: delete subsequent messages and re-send
   const handleEditMessage = async (messageId: string, newContent: string) => {
-    const sorted = [...(messages ?? [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const sorted = [...(messages ?? [])].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
     const idx = sorted.findIndex((m) => m.id === messageId);
     if (idx === -1) return;
 
@@ -410,7 +447,9 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   // Export conversation as markdown
   const handleExportConversation = () => {
-    const sorted = [...(messages ?? [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const sorted = [...(messages ?? [])].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
     const lines = sorted.map((m) => {
       const role = m.role === "user" ? "**You**" : m.role === "assistant" ? "**LovPlan Architect**" : "*System*";
       const time = new Date(m.created_at).toLocaleString();
@@ -435,7 +474,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       if (e1) throw e1;
       const { error: e2 } = await supabase.from("generated_prompts").delete().eq("project_id", id);
       if (e2) throw e2;
-      const { error: e3 } = await supabase.from("projects").update({ status: "discovery", spec_data: {} as Json }).eq("id", id);
+      const { error: e3 } = await supabase
+        .from("projects")
+        .update({ status: "discovery", spec_data: {} as Json })
+        .eq("id", id);
       if (e3) throw e3;
       queryClient.invalidateQueries({ queryKey: ["conversations", id] });
       queryClient.invalidateQueries({ queryKey: ["prompts", id] });
@@ -483,7 +525,9 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     setPendingComplete(false);
 
     try {
-      const { data: invokeData, error: invokeError } = await supabase.functions.invoke("generate-prompts", { body: { project_id: id } });
+      const { data: invokeData, error: invokeError } = await supabase.functions.invoke("generate-prompts", {
+        body: { project_id: id },
+      });
       if (invokeError) {
         if (!handleWebhookError(invokeError, navigate, { setCreditsModalOpen })) {
           throw invokeError;
@@ -493,7 +537,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
       }
 
       // The edge function will trigger n8n, which responds immediately (async background task).
-      // We don't expect the prompt list in 'invokeData'. 
+      // We don't expect the prompt list in 'invokeData'.
       // Instead, we manually set the project to "generating" so the UI begins polling.
       await supabase.from("projects").update({ status: "generating" }).eq("id", id);
       queryClient.invalidateQueries({ queryKey: ["project", id] });
@@ -515,7 +559,6 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   return (
     <>
-
       {/* Clear & Restart confirm dialog */}
       <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
         <DialogContent className="max-w-sm border-border bg-card">
@@ -526,8 +569,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3 mt-4">
-            <Button variant="outline" size="sm" onClick={() => setClearDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" size="sm" onClick={handleClearRestart}>Clear & Restart</Button>
+            <Button variant="outline" size="sm" onClick={() => setClearDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleClearRestart}>
+              Clear & Restart
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -542,8 +589,12 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3 mt-4">
-            <Button variant="outline" size="sm" onClick={() => setCreditsModalOpen(false)}>Cancel</Button>
-            <Button variant="amber" size="sm" onClick={() => navigate("/pricing")}>Buy Credits</Button>
+            <Button variant="outline" size="sm" onClick={() => setCreditsModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="amber" size="sm" onClick={() => navigate("/pricing")}>
+              Buy Credits
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -555,7 +606,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             <h2 className="font-heading text-sm text-foreground truncate">{project.name}</h2>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors" aria-label="Chat options">
+                <button
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Chat options"
+                >
                   <Settings2 className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
@@ -564,7 +618,10 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                   <Download className="mr-2 h-3.5 w-3.5" /> Export Conversation
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setClearDialogOpen(true)} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem
+                  onClick={() => setClearDialogOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
                   <RotateCcw className="mr-2 h-3.5 w-3.5" /> Clear & Restart
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -572,14 +629,20 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
           </div>
 
           {/* Messages */}
-          <div ref={scrollRef} onScroll={handleScroll} className="relative flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="relative flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-5"
+          >
             {messagesLoading ? (
               <div className="space-y-4">
                 {[0, 1, 2].map((i) => (
                   <div key={i} className={`flex ${i % 2 ? "justify-end" : "justify-start"}`}>
                     <div className={`space-y-2 ${i % 2 ? "w-[55%]" : "w-[65%]"}`}>
                       <Skeleton className={`h-3 w-20 rounded ${i % 2 ? "ml-auto" : ""}`} />
-                      <Skeleton className={`h-14 w-full ${i % 2 ? "rounded-[12px_12px_4px_12px]" : "rounded-[12px_12px_12px_4px]"}`} />
+                      <Skeleton
+                        className={`h-14 w-full ${i % 2 ? "rounded-[12px_12px_4px_12px]" : "rounded-[12px_12px_12px_4px]"}`}
+                      />
                     </div>
                   </div>
                 ))}
@@ -587,9 +650,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             ) : !allMessages.length ? (
               <div className="flex h-full items-center justify-center">
                 <div className="w-full max-w-[400px] rounded-card border border-border bg-card p-8 text-center">
-                  <p className="font-heading text-xl text-foreground">
-                    Hi! I'm your LovPlan Architect 🏗
-                  </p>
+                  <p className="font-heading text-xl text-foreground">Hi! I'm your LovPlan Architect 🏗</p>
                   <p className="mt-2 font-body text-sm text-muted-foreground">
                     I'll ask you about your app idea, target users, features, and tech preferences. Let's start!
                   </p>
@@ -598,38 +659,43 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             ) : (
               <>
                 {allMessages.map((msg) => {
-                  if (msg.role === "user") return (
-                    <UserMessage
-                      key={msg.id}
-                      content={msg.content}
-                      createdAt={msg.created_at}
-                      messageId={msg.id}
-                      onEdit={handleEditMessage}
-                      onDelete={handleDeleteMessage}
-                    />
-                  );
-                  if (msg.role === "assistant") return (
-                    <AssistantMessage
-                      key={msg.id}
-                      content={msg.content}
-                      createdAt={msg.created_at}
-                      onOptionClick={msg.id === lastAssistantMsgId ? (text) => {
-                        // text may be a single option or comma-joined multi-select choices
-                        const cleanText = text.trim();
-                        // If the only thing selected is "Other (specify)" alone, populate the input
-                        const parts = cleanText.split(",").map((s) => s.trim());
-                        const isSoleOther =
-                          parts.length === 1 &&
-                          /other.*specify|specify.*other/i.test(parts[0]);
-                        if (isSoleOther) {
-                          setInput("");
-                          setTimeout(() => inputRef.current?.focus(), 50);
-                        } else {
-                          sendMessage(cleanText);
+                  if (msg.role === "user")
+                    return (
+                      <UserMessage
+                        key={msg.id}
+                        content={msg.content}
+                        createdAt={msg.created_at}
+                        messageId={msg.id}
+                        onEdit={handleEditMessage}
+                        onDelete={handleDeleteMessage}
+                      />
+                    );
+                  if (msg.role === "assistant")
+                    return (
+                      <AssistantMessage
+                        key={msg.id}
+                        content={msg.content}
+                        createdAt={msg.created_at}
+                        onOptionClick={
+                          msg.id === lastAssistantMsgId
+                            ? (text) => {
+                                // text may be a single option or comma-joined multi-select choices
+                                const cleanText = text.trim();
+                                // If the only thing selected is "Other (specify)" alone, populate the input
+                                const parts = cleanText.split(",").map((s) => s.trim());
+                                const isSoleOther =
+                                  parts.length === 1 && /other.*specify|specify.*other/i.test(parts[0]);
+                                if (isSoleOther) {
+                                  setInput("");
+                                  setTimeout(() => inputRef.current?.focus(), 50);
+                                } else {
+                                  sendMessage(cleanText);
+                                }
+                              }
+                            : undefined
                         }
-                      } : undefined}
-                    />
-                  );
+                      />
+                    );
                   if (msg.role === "system") return <SystemMessage key={msg.id} content={msg.content} />;
                   return null;
                 })}
@@ -674,9 +740,20 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                 disabled={sending}
                 className="max-h-32 min-h-[44px] flex-1 resize-none rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-primary disabled:opacity-50"
                 style={{ height: "auto", overflow: "hidden" }}
-                onInput={(e) => { const t = e.currentTarget; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 128) + "px"; }}
+                onInput={(e) => {
+                  const t = e.currentTarget;
+                  t.style.height = "auto";
+                  t.style.height = Math.min(t.scrollHeight, 128) + "px";
+                }}
               />
-              <Button variant="amber" size="icon" onClick={handleSend} disabled={!input.trim() || sending} className="h-11 w-11 shrink-0 rounded-full" aria-label="Send message">
+              <Button
+                variant="amber"
+                size="icon"
+                onClick={handleSend}
+                disabled={!input.trim() || sending}
+                className="h-11 w-11 shrink-0 rounded-full"
+                aria-label="Send message"
+              >
                 {rateLimited && rateLimitCountdown > 0 ? (
                   <span className="font-body text-xs font-semibold">{rateLimitCountdown}s</span>
                 ) : (
@@ -685,13 +762,29 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
               </Button>
               <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
                 <SheetTrigger asChild className="lg:hidden">
-                  <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground" aria-label="Project info">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 shrink-0 text-muted-foreground"
+                    aria-label="Project info"
+                  >
                     <PanelRightOpen className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[300px] border-l-border bg-card p-0">
-                  <SheetHeader className="sr-only"><SheetTitle>Project Info</SheetTitle></SheetHeader>
-                  <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} pendingComplete={pendingComplete} onKeepRefining={handleKeepRefining} />
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Project Info</SheetTitle>
+                  </SheetHeader>
+                  <ProjectInfoSidebar
+                    project={project}
+                    currentPhase={currentPhase}
+                    loading={false}
+                    onEndDiscovery={handleEndDiscovery}
+                    onGeneratePrompts={handleGeneratePrompts}
+                    isGenerating={isGenerating}
+                    pendingComplete={pendingComplete}
+                    onKeepRefining={handleKeepRefining}
+                  />
                 </SheetContent>
               </Sheet>
             </div>
@@ -699,7 +792,16 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         </div>
 
         <aside className="hidden w-[320px] shrink-0 border-l border-border bg-card lg:block overflow-y-auto">
-          <ProjectInfoSidebar project={project} currentPhase={currentPhase} loading={false} onEndDiscovery={handleEndDiscovery} onGeneratePrompts={handleGeneratePrompts} isGenerating={isGenerating} pendingComplete={pendingComplete} onKeepRefining={handleKeepRefining} />
+          <ProjectInfoSidebar
+            project={project}
+            currentPhase={currentPhase}
+            loading={false}
+            onEndDiscovery={handleEndDiscovery}
+            onGeneratePrompts={handleGeneratePrompts}
+            isGenerating={isGenerating}
+            pendingComplete={pendingComplete}
+            onKeepRefining={handleKeepRefining}
+          />
         </aside>
       </div>
     </>
@@ -712,7 +814,11 @@ const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [isGeneratingStatus, setIsGeneratingStatus] = useState(false);
 
-  const { data: activeProject, isLoading, error } = useProject(id, {
+  const {
+    data: activeProject,
+    isLoading,
+    error,
+  } = useProject(id, {
     refetchInterval: isGeneratingStatus ? 3000 : false,
   });
 
@@ -740,7 +846,9 @@ const ProjectDetail = () => {
     case "ready":
     case "completed":
     case "revising":
-      return <PromptViewer projectId={activeProject.id} projectName={activeProject.name} metadata={activeProject.metadata} />;
+      return (
+        <PromptViewer projectId={activeProject.id} projectName={activeProject.name} metadata={activeProject.metadata} />
+      );
     default:
       return <DiscoveryChat project={activeProject} />;
   }
