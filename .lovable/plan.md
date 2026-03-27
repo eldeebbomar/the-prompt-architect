@@ -1,34 +1,59 @@
 
-
 ## Goal
-Activate branded auth emails so all authentication emails (signup confirmation, password reset, magic link, etc.) are sent from `notify.lovplan.com` with LovPlan branding instead of the default Supabase templates.
+Stop fallback Supabase emails and ensure all auth emails are LovPlan-branded, sent from your configured domain, with auth redirects consistently pointing to `https://lovplan.com`.
 
-## What's Wrong
-- The `auth-email-hook` Edge Function exists in the codebase with branded templates
-- But it was manually created — it was never scaffolded through the managed email system, so the hook is not activated
-- Result: Supabase falls back to its built-in default templates (the plain HTML you see in the dashboard)
+## What I found (current state)
+- You are on the correct Supabase project (`gnovkpjawtodjcgizxsh`) — this is not a wrong-project issue.
+- Auth logs still show `mail_from: noreply@mail.app.supabase.io`, which confirms fallback/default auth email path is still active.
+- `auth-email-hook` code is branded correctly in repo, but there are no runtime logs from it, so it’s not active in the live auth pipeline.
+- Queue infrastructure required by that hook is incomplete in DB right now:
+  - Missing function: `enqueue_email`
+  - Missing tables: `email_send_state`, `suppressed_emails`, `email_unsubscribe_tokens`
+  - Only `email_send_log` exists
+- Frontend redirect code is already hardcoded to `https://lovplan.com` in login/signup; I’ll still run a full redirect audit.
 
-## Fix
+## Implementation plan
+1. Re-activate managed email pipeline on the existing verified domain  
+   - Re-run managed email infrastructure setup for `notify.lovplan.com`/`lovplan.com` so the queue + dispatcher stack is fully provisioned in this project.
 
-### Step 1: Scaffold auth email templates via the managed system
-Use the managed scaffolding tool to properly create and register the auth-email-hook. This overwrites the existing manually-created hook with one that's properly integrated into the email pipeline.
+2. Re-scaffold auth email hook through managed setup (overwrite existing)  
+   - Replace the manually drifted hook wiring with managed hook registration so Supabase Auth actually routes events to it.
 
-### Step 2: Apply LovPlan brand styling to scaffolded templates
-After scaffolding, update all 6 templates to match LovPlan's visual identity:
-- Primary color: `#D4952A` (amber/gold)
-- Fonts: DM Serif Display for headings, Outfit for body text
-- Copy style: warm, professional tone matching the app
-- Email body background: white (#ffffff)
+3. Re-apply LovPlan branding after scaffold  
+   - Ensure all 6 auth templates use LovPlan styling/copy and sender identity:
+     - Brand name: `LovPlan`
+     - Visible sender: `LovPlan <noreply@lovplan.com>`
+     - Sending domain: `notify.lovplan.com`
+     - Links/site references: `https://lovplan.com`
 
-### Step 3: Deploy the auth-email-hook Edge Function
-Redeploy to activate the hook in the managed email pipeline.
+4. Deploy updated auth email hook  
+   - Publish the hook so the live auth flow uses branded templates instead of fallback defaults.
 
-### Step 4: Verify activation
-Confirm the hook is active and emails will route through it instead of the default Supabase templates.
+5. Redirect hardening audit (all auth flows)  
+   - Confirm every auth redirect path stays on `https://lovplan.com`:
+     - Signup confirmation redirect
+     - Google OAuth redirect
+     - Any additional auth redirects in code and auth settings
 
-## Technical Details
-- The Supabase dashboard templates (Authentication → Emails) are DEFAULT fallback templates — they are NOT the same as the Edge Function hook
-- The managed scaffolding tool registers the hook with the email system so it intercepts auth emails
-- Domain `notify.lovplan.com` is already verified, so emails will send immediately after activation
-- Files affected: `supabase/functions/auth-email-hook/index.ts` and all templates in `supabase/functions/_shared/email-templates/`
+6. End-to-end verification in production  
+   - Trigger signup + password reset
+   - Confirm:
+     - Sender is LovPlan/domain-based (not `mail.app.supabase.io`)
+     - Email content is branded
+     - Links land on `lovplan.com`
+     - Hook logs and send-log entries appear for each auth event
 
+## Technical details
+- Files to verify/update:
+  - `supabase/functions/auth-email-hook/index.ts`
+  - `supabase/functions/_shared/email-templates/{signup,magic-link,recovery,invite,email-change,reauthentication}.tsx`
+  - `src/pages/Signup.tsx`
+  - `src/pages/Login.tsx`
+- DB/runtime artifacts expected after repair:
+  - Function: `enqueue_email`
+  - Tables: `email_send_state`, `suppressed_emails`, `email_unsubscribe_tokens` (+ existing `email_send_log`)
+  - Active queue dispatcher for email processing
+- Success criteria:
+  - New auth logs no longer show `noreply@mail.app.supabase.io`
+  - Branded auth emails are received with LovPlan identity
+  - Redirects consistently resolve to `https://lovplan.com`
