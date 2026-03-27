@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           content: string
@@ -99,6 +132,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          message_id: string | null
+          recipient_email: string | null
+          status: string
+          template_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          recipient_email?: string | null
+          status?: string
+          template_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          recipient_email?: string | null
+          status?: string
+          template_name?: string | null
+        }
+        Relationships: []
       }
       extension_link_codes: {
         Row: {
@@ -255,8 +318,11 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          is_admin: boolean
           payment_failed: boolean
           plan: string
+          referral_code: string | null
+          referral_count: number
           revision_limit: number | null
           stripe_customer_id: string | null
           total_credits_purchased: number
@@ -269,8 +335,11 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          is_admin?: boolean
           payment_failed?: boolean
           plan?: string
+          referral_code?: string | null
+          referral_count?: number
           revision_limit?: number | null
           stripe_customer_id?: string | null
           total_credits_purchased?: number
@@ -283,8 +352,11 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          is_admin?: boolean
           payment_failed?: boolean
           plan?: string
+          referral_code?: string | null
+          referral_count?: number
           revision_limit?: number | null
           stripe_customer_id?: string | null
           total_credits_purchased?: number
@@ -297,6 +369,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_public: boolean
           metadata: Json
           name: string
           spec_data: Json
@@ -308,6 +381,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_public?: boolean
           metadata?: Json
           name: string
           spec_data?: Json
@@ -319,6 +393,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_public?: boolean
           metadata?: Json
           name?: string
           spec_data?: Json
@@ -350,11 +425,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_referral: {
+        Args: { p_new_user_id: string; p_referral_code: string }
+        Returns: Json
+      }
       check_credits: { Args: { p_user_id: string }; Returns: number }
       deduct_credit: {
         Args: { p_description: string; p_project_id: string; p_user_id: string }
         Returns: boolean
       }
+      get_admin_stats: { Args: { p_user_id: string }; Returns: Json }
       get_credit_stats: { Args: { p_user_id: string }; Returns: Json }
       match_lovable_docs: {
         Args: { filter?: Json; match_count?: number; query_embedding: string }
