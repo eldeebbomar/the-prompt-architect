@@ -24,7 +24,7 @@ const Signup = () => {
         password,
         options: {
           data: { full_name: fullName },
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: "https://lovplan.com",
         },
       });
       if (error) {
@@ -58,7 +58,7 @@ const Signup = () => {
     }
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: "https://lovplan.com/dashboard" },
     });
   };
 

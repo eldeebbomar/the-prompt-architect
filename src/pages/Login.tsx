@@ -27,7 +27,7 @@ const Login = () => {
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: "https://lovplan.com/dashboard" },
     });
   };
 
