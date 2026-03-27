@@ -891,7 +891,7 @@ const ProjectDetail = () => {
     case "discovery":
       return <DiscoveryChat project={activeProject} />;
     case "generating":
-      return <GeneratingView projectName={activeProject.name} />;
+      return <GeneratingView projectName={activeProject.name} projectId={activeProject.id} />;
     case "ready":
     case "completed":
     case "revising":
