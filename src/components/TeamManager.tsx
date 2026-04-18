@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Users, UserPlus, Trash2, Loader2, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { handleWebhookError } from "@/lib/webhook-error-handler";
 
 interface Member {
   id: string;
@@ -32,6 +34,7 @@ interface TeamManagerProps {
 }
 
 const TeamManager = ({ projectId, isOwner }: TeamManagerProps) => {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -48,12 +51,18 @@ const TeamManager = ({ projectId, isOwner }: TeamManagerProps) => {
       if (error) throw error;
       setMembers(data?.members ?? []);
       setInvites(data?.invites ?? []);
-    } catch {
-      // Silently fail — user may not be owner
+    } catch (err) {
+      // 403 means user isn't owner — that's expected, silence it. Anything
+      // else should surface through the shared handler so 401/500 don't get
+      // swallowed.
+      const status = (err as { context?: { status?: number } })?.context?.status;
+      if (status && status !== 403) {
+        handleWebhookError(err as any, navigate);
+      }
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, navigate]);
 
   useEffect(() => {
     if (open) fetchTeam();
@@ -75,8 +84,10 @@ const TeamManager = ({ projectId, isOwner }: TeamManagerProps) => {
         setInviteEmail("");
         fetchTeam();
       }
-    } catch {
-      toast.error("Failed to send invite.");
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to send invite.");
+      }
     } finally {
       setInviting(false);
     }
@@ -90,8 +101,10 @@ const TeamManager = ({ projectId, isOwner }: TeamManagerProps) => {
       if (error) throw error;
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
       toast.success("Team member removed.");
-    } catch {
-      toast.error("Failed to remove member.");
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to remove member.");
+      }
     }
   };
 

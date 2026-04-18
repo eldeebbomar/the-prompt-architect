@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { fetchN8n, n8nErrorResponse } from "../_shared/n8n.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+
+const VALID_TYPES = new Set(["initial", "loop", "knowledge", undefined, null, ""]);
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -22,6 +26,12 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { persistSession: false } },
+    );
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -33,11 +43,25 @@ Deno.serve(async (req) => {
     }
 
     const userId = user.id;
-    const { project_id, type } = await req.json();
+
+    // 5 generations per hour keeps runaway retries in check while still
+    // allowing a normal "retry-after-timeout" flow.
+    const throttled = await enforceRateLimit(admin, userId, "generate-prompts", 5, 3600, corsHeaders);
+    if (throttled) return throttled;
+
+    const body = await req.json().catch(() => ({}));
+    const project_id = typeof body?.project_id === "string" ? body.project_id : "";
+    const type = typeof body?.type === "string" ? body.type : undefined;
 
     if (!project_id) {
       return new Response(
         JSON.stringify({ error: "project_id is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!VALID_TYPES.has(type)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid type" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -60,30 +84,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Route to correct n8n webhook based on type
-    const webhookPath = type === "loop" ? "loop-prompts" : type === "knowledge" ? "generate-knowledge" : "generate-prompts";
+    const webhookPath =
+      type === "loop" ? "loop-prompts" :
+        type === "knowledge" ? "generate-knowledge" :
+          "generate-prompts";
     const webhookUrl = `${webhookBase.replace(/\/$/, "")}/webhook/${webhookPath}`;
 
-    const n8nResponse = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ project_id, user_id: userId, type }),
+    // n8n handles generation async — we just need ack. 120s ceiling covers
+    // slow n8n startup without hanging requests forever.
+    const result = await fetchN8n(webhookUrl, {
+      timeoutMs: 120_000,
+      headers: { Authorization: authHeader },
+      body: { project_id, user_id: userId, type },
     });
 
-    if (!n8nResponse.ok) {
-      const errText = await n8nResponse.text();
-      console.error("n8n generate-prompts error:", n8nResponse.status, errText);
-      return new Response(
-        JSON.stringify({ error: "Prompt generation failed" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!result.ok) {
+      return n8nErrorResponse(result, corsHeaders);
     }
 
-    const result = await n8nResponse.json();
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(result.body), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

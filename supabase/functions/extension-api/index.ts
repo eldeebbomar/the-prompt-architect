@@ -23,12 +23,12 @@ serve(async (req: Request) => {
       { auth: { persistSession: false } },
     );
 
-    // Validate token
+    // Validate token + expiry.
     const { data: session, error: sessionError } = await admin
       .from("extension_sessions")
-      .select("id, user_id")
+      .select("id, user_id, expires_at")
       .eq("token", extensionToken)
-      .single();
+      .maybeSingle();
 
     if (sessionError || !session) {
       return new Response(
@@ -37,33 +37,63 @@ serve(async (req: Request) => {
       );
     }
 
-    // Update last_used_at
+    if (session.expires_at && new Date(session.expires_at) < new Date()) {
+      await admin.from("extension_sessions").delete().eq("id", session.id);
+      return new Response(
+        JSON.stringify({ error: "Session expired", code: "session_expired" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const userId = session.user_id;
+
+    // Subscription gate: extension requires a paid plan and no failed payment.
+    // Fetched once per request — every endpoint needs this check.
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("id, email, plan, full_name, payment_failed")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({ error: "User not found" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (profile.plan === "free" || profile.payment_failed === true) {
+      return new Response(
+        JSON.stringify({
+          error: "Subscription required",
+          code: "subscription_required",
+          plan: profile.plan,
+          payment_failed: profile.payment_failed === true,
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     await admin
       .from("extension_sessions")
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", session.id);
 
-    const userId = session.user_id;
-
-    // Route based on URL path
     const url = new URL(req.url);
     const path = url.pathname.split("/extension-api").pop() || "/";
 
-    // GET /me
     if (path === "/me" || path === "/me/") {
-      const { data: profile } = await admin
-        .from("profiles")
-        .select("id, email, plan, full_name")
-        .eq("id", userId)
-        .single();
-
       return new Response(
-        JSON.stringify(profile),
+        JSON.stringify({
+          id: profile.id,
+          email: profile.email,
+          plan: profile.plan,
+          full_name: profile.full_name,
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // GET /projects
     if (path === "/projects" || path === "/projects/") {
       const { data: projects, error: projError } = await admin
         .from("projects")
@@ -74,7 +104,6 @@ serve(async (req: Request) => {
 
       if (projError) throw projError;
 
-      // Get prompt counts for each project
       const projectsWithCounts = await Promise.all(
         (projects || []).map(async (p) => {
           const { count } = await admin
@@ -91,18 +120,16 @@ serve(async (req: Request) => {
       );
     }
 
-    // GET /projects/:id/prompts
     const promptsMatch = path.match(/^\/projects\/([^/]+)\/prompts\/?$/);
     if (promptsMatch) {
       const projectId = promptsMatch[1];
 
-      // Verify project belongs to user
       const { data: project, error: projError } = await admin
         .from("projects")
         .select("id")
         .eq("id", projectId)
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (projError || !project) {
         return new Response(
@@ -125,18 +152,16 @@ serve(async (req: Request) => {
       );
     }
 
-    // POST /projects/:id/deploy-complete
     const deployMatch = path.match(/^\/projects\/([^/]+)\/deploy-complete\/?$/);
     if (deployMatch && req.method === "POST") {
       const projectId = deployMatch[1];
 
-      // Verify project belongs to user
       const { data: proj, error: projErr } = await admin
         .from("projects")
-        .select("id, metadata")
+        .select("id, status, metadata")
         .eq("id", projectId)
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (projErr || !proj) {
         return new Response(
@@ -152,11 +177,31 @@ serve(async (req: Request) => {
         ? proj.metadata as Record<string, unknown>
         : {};
 
+      // Idempotent: only set deployed_at once. Subsequent calls return
+      // current state without mutating anything.
+      if (existingMeta.deployed_at) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            already_completed: true,
+            deployed_at: existingMeta.deployed_at,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const promptCount =
+        typeof body.prompt_count === "number" &&
+        Number.isFinite(body.prompt_count) &&
+        body.prompt_count >= 0
+          ? body.prompt_count
+          : null;
+
       const updatedMeta = {
         ...existingMeta,
         deployed_at: new Date().toISOString(),
         deployed_via: "chrome_extension",
-        deployed_prompt_count: body.prompt_count || null,
+        deployed_prompt_count: promptCount,
       };
 
       const { error: updateErr } = await admin
@@ -167,7 +212,7 @@ serve(async (req: Request) => {
       if (updateErr) throw updateErr;
 
       return new Response(
-        JSON.stringify({ success: true }),
+        JSON.stringify({ success: true, already_completed: false }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

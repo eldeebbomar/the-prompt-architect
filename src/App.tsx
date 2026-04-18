@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute, PublicOnlyRoute, AdminRoute } from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import RouteErrorBoundary from "@/components/RouteErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import DashboardLayout from "./components/DashboardLayout";
 import QuickSearch from "./components/QuickSearch";
@@ -67,8 +68,9 @@ const App = () => (
                 Skip to content
               </a>
               <QuickSearch />
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
+              <RouteErrorBoundary>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
                   {/* Public layout with navbar */}
                   <Route element={<MainLayout />}>
                     <Route path="/" element={<Index />} />
@@ -94,9 +96,10 @@ const App = () => (
                     <Route path="/invite/:token" element={<AcceptInvite />} />
                   </Route>
 
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </RouteErrorBoundary>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>

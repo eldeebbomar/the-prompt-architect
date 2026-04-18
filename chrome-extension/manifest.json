@@ -3,10 +3,9 @@
   "name": "LovPlan Deployer",
   "version": "1.0.0",
   "description": "Deploy LovPlan prompts to Lovable.dev automatically. Select a project, click deploy, and watch your prompts get queued.",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": [
     "https://lovable.dev/*",
-    "https://*.lovable.dev/*",
     "https://gnovkpjawtodjcgizxsh.supabase.co/*"
   ],
   "action": {
@@ -22,7 +21,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://lovable.dev/*", "https://*.lovable.dev/*"],
+      "matches": ["https://lovable.dev/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
@@ -34,5 +33,7 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'"
-  }
+  },
+  "homepage_url": "https://lovplan.com",
+  "author": "LovPlan"
 }

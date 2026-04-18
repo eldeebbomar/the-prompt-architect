@@ -4,7 +4,8 @@ import { Plus, Coins, FolderOpen, FileText, ArrowRight, Compass, Sparkles } from
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
-import { useRecentProjects, useProjectCount, usePromptCount } from "@/hooks/use-projects";
+import { useRecentProjects, useProjectCount, usePromptCount, useAllProjectIds } from "@/hooks/use-projects";
+import { pruneCopiedPromptStorage } from "@/hooks/use-prompt-export";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -30,6 +31,16 @@ const Dashboard = () => {
   const { data: projectCount, isLoading: projectsLoading } = useProjectCount();
   const { data: projects, isLoading: recentLoading } = useRecentProjects(4);
   const { data: promptCount, isLoading: promptsLoading } = usePromptCount();
+  const { data: allProjectIds } = useAllProjectIds();
+
+  // Prune localStorage for projects no longer owned by this user. Runs once
+  // per load of the dashboard — cheap, bounded, and keeps quota in check.
+  const prunedRef = useRef(false);
+  useEffect(() => {
+    if (prunedRef.current || !allProjectIds) return;
+    prunedRef.current = true;
+    pruneCopiedPromptStorage(allProjectIds);
+  }, [allProjectIds]);
 
   // Apply stored referral code on first load
   const referralApplied = useRef(false);
@@ -47,8 +58,14 @@ const Dashboard = () => {
         toast.success("Referral bonus applied! You got 1 free credit.");
         queryClient.invalidateQueries({ queryKey: ["credits"] });
         queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
+        return;
       }
-      // Silently ignore failures — user still gets their account
+      // Keep the UX silent (the user is already in), but log so we can spot a
+      // broken referral pipeline in production.
+      if (error) console.warn("[dashboard] apply-referral failed:", error);
+      else if (data?.error) console.warn("[dashboard] referral rejected:", data.error);
+    }).catch((err) => {
+      console.warn("[dashboard] apply-referral threw:", err);
     });
   }, [queryClient]);
 

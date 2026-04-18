@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { Rocket, Coins, Sparkles, LayoutTemplate, PenLine } from "lucide-react";
@@ -94,6 +94,29 @@ const projectSchema = z.object({
 
 type FormErrors = Partial<Record<keyof z.infer<typeof projectSchema>, string>>;
 
+function generateUuidV4(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // RFC 4122 v4 polyfill for the rare browser without randomUUID. Uses
+  // getRandomValues for entropy when available, Math.random as a last resort.
+  const rand = (n: number) => {
+    if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+      const buf = new Uint8Array(n);
+      crypto.getRandomValues(buf);
+      return buf;
+    }
+    const buf = new Uint8Array(n);
+    for (let i = 0; i < n; i++) buf[i] = Math.floor(Math.random() * 256);
+    return buf;
+  };
+  const bytes = rand(16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
+
 const NewProject = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -105,6 +128,8 @@ const NewProject = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
+  const submittingRef = useRef(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const handleSelectTemplate = (template: typeof PROJECT_TEMPLATES[number]) => {
     setName(template.prefill.name);
@@ -129,12 +154,27 @@ const NewProject = () => {
     }
 
     if (!user) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
 
+    // Reuse the same idempotency key across retries of this submit so the
+    // backend dedupes; a fresh submit (after navigating back or clearing the
+    // form) gets a new key. Must be a valid UUID — the server regex is
+    // strict and falls back to generating its own key otherwise, defeating
+    // the whole dedupe.
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateUuidV4();
+    }
+
     try {
-      // 1. Create project & deduct credit atomically via secure Edge Function
       const { data: createData, error: createError } = await supabase.functions.invoke("create-project", {
-        body: { name: result.data.name, description: result.data.pitch },
+        body: {
+          name: result.data.name,
+          description: result.data.pitch,
+          idempotency_key: idempotencyKeyRef.current,
+        },
+        headers: { "Idempotency-Key": idempotencyKeyRef.current },
       });
 
       if (createError) {
@@ -144,6 +184,7 @@ const NewProject = () => {
       if (createData?.error) {
         if (createData.error === "Insufficient credits") {
           setShowCreditModal(true);
+          submittingRef.current = false;
           setSubmitting(false);
           return;
         }
@@ -161,13 +202,17 @@ const NewProject = () => {
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
 
-      toast.success(`1 credit used for project: ${result.data.name}`);
+      if (!createData.idempotent_replay) {
+        toast.success(`1 credit used for project: ${result.data.name}`);
+      }
+      idempotencyKeyRef.current = null;
       navigate(`/project/${project.id}`);
     } catch (err) {
       if (!handleWebhookError(err as any, navigate)) {
         toast.error("Something went wrong. Please try again.");
       }
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -252,6 +297,7 @@ const NewProject = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. AI Marketplace"
+              maxLength={100}
               className={`w-full rounded-input border bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors ${
                 errors.name
                   ? "border-destructive focus:border-destructive"
@@ -273,6 +319,7 @@ const NewProject = () => {
               onChange={(e) => setPitch(e.target.value)}
               placeholder="e.g. A marketplace connecting businesses with freelance AI consultants"
               rows={3}
+              maxLength={500}
               className={`w-full resize-none rounded-input border bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors ${
                 errors.pitch
                   ? "border-destructive focus:border-destructive"

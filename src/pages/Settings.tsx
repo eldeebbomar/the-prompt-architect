@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { handleWebhookError } from "@/lib/webhook-error-handler";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const Settings = () => {
   const { user, profile, signOut } = useAuth();
@@ -50,10 +51,14 @@ const Settings = () => {
   const handleCopyReferral = async () => {
     if (!referralCode) return;
     const url = `${window.location.origin}/signup?ref=${referralCode}`;
-    await navigator.clipboard.writeText(url);
-    setCodeCopied(true);
-    toast.success("Referral link copied!");
-    setTimeout(() => setCodeCopied(false), 2000);
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      setCodeCopied(true);
+      toast.success("Referral link copied!");
+      setTimeout(() => setCodeCopied(false), 2000);
+    } else {
+      toast.error("Couldn't copy. Link: " + url);
+    }
   };
 
   // API key state
@@ -90,8 +95,10 @@ const Settings = () => {
         setNewKeyName("");
         toast.success("API key created. Copy it now — it won't be shown again.");
       }
-    } catch {
-      toast.error("Failed to create API key.");
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to create API key.");
+      }
     } finally {
       setApiKeyLoading(false);
     }
@@ -105,8 +112,10 @@ const Settings = () => {
       if (error) throw error;
       setApiKeys((prev) => prev.filter((k) => k.id !== keyId));
       toast.success("API key revoked.");
-    } catch {
-      toast.error("Failed to revoke API key.");
+    } catch (err) {
+      if (!handleWebhookError(err as any, navigate)) {
+        toast.error("Failed to revoke API key.");
+      }
     }
   };
 
@@ -496,8 +505,9 @@ const Settings = () => {
                       size="sm"
                       className="shrink-0 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
                       onClick={async () => {
-                        await navigator.clipboard.writeText(newKeyValue);
-                        toast.success("API key copied!");
+                        const ok = await copyToClipboard(newKeyValue);
+                        if (ok) toast.success("API key copied!");
+                        else toast.error("Couldn't copy. Select the text manually.");
                       }}
                     >
                       <Copy className="h-3.5 w-3.5" /> Copy

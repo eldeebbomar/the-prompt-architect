@@ -1,7 +1,26 @@
 import { useState, useCallback } from "react";
 import type { Json } from "@/integrations/supabase/types";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const STORAGE_KEY_PREFIX = "lovplan_copied_prompts_";
+
+/**
+ * Prune localStorage keys for projects no longer in the active list. Called
+ * from the dashboard to keep quota usage sane as users accumulate projects.
+ * Accepts the full list of project IDs the user currently owns.
+ */
+export function pruneCopiedPromptStorage(activeProjectIds: string[]): void {
+  if (typeof localStorage === "undefined") return;
+  const allowed = new Set(activeProjectIds);
+  const toRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(STORAGE_KEY_PREFIX)) continue;
+    const id = key.slice(STORAGE_KEY_PREFIX.length);
+    if (!allowed.has(id)) toRemove.push(key);
+  }
+  toRemove.forEach((k) => localStorage.removeItem(k));
+}
 
 export interface PromptData {
   id: string;
@@ -56,10 +75,12 @@ export function usePromptExport(projectId: string, prompts: PromptData[], metada
           `## ${p.sequence_order}. ${p.title}\n**Category:** ${p.category}\n**Purpose:** ${p.purpose}\n\n${p.prompt_text}`
       )
       .join("\n\n---\n\n");
-    await navigator.clipboard.writeText(text);
+    const ok = await copyToClipboard(text);
+    if (!ok) return false;
     const allIds = new Set(prompts.map((p) => p.id));
     setCopiedSet(allIds);
     localStorage.setItem(storageKey, JSON.stringify([...allIds]));
+    return true;
   }, [prompts, storageKey]);
 
   const downloadMarkdown = useCallback(() => {

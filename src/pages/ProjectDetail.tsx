@@ -158,6 +158,18 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const [completeDismissed, setCompleteDismissed] = useState(false); // user clicked "Keep Discussing"
   const autoSentRef = useRef(false);
   const generateTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const lastProjectIdRef = useRef<string | null>(null);
+  const specCompleteChecked = useRef(false);
+
+  // Reset auto-send when navigating between projects (component may stay
+  // mounted across id changes depending on router behaviour).
+  useEffect(() => {
+    if (lastProjectIdRef.current !== id) {
+      autoSentRef.current = false;
+      specCompleteChecked.current = false;
+      lastProjectIdRef.current = id;
+    }
+  }, [id]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -168,7 +180,6 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   }, []);
 
   // Detect if spec was already marked complete on load (e.g. page refresh)
-  const specCompleteChecked = useRef(false);
   useEffect(() => {
     if (specCompleteChecked.current || messagesLoading) return;
     const specData =
@@ -218,11 +229,30 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
   const allMessages = useMemo(() => {
     const real = messages ?? [];
     const realIds = new Set(real.map((m) => m.id));
-    // Match by content+role to catch optimistic messages that now exist in DB with different IDs
-    const realContentKeys = new Set(real.map((m) => `${m.role}::${m.content}`));
-    const extras = optimisticMessages.filter(
-      (m) => !realIds.has(m.id) && !realContentKeys.has(`${m.role}::${m.content}`),
+    // Dedup strategy:
+    // 1. Drop optimistic whose temp ID matches a real row (shouldn't happen but cheap).
+    // 2. Drop optimistic whose client_id metadata matches a real message's metadata
+    //    (n8n persists metadata when configured; this is the reliable path).
+    // 3. Fall back to (role, content, coarse-timestamp) tuple — same-content
+    //    messages sent seconds apart by the same role collide rarely.
+    const realClientIds = new Set(
+      real
+        .map((m) => (m.metadata as Record<string, unknown> | null)?.client_id as string | undefined)
+        .filter(Boolean),
     );
+    const realFingerprints = new Set(
+      real.map((m) => {
+        const ts = Math.floor(new Date(m.created_at).getTime() / 10_000); // 10s bucket
+        return `${m.role}::${m.content}::${ts}`;
+      }),
+    );
+    const extras = optimisticMessages.filter((m) => {
+      if (realIds.has(m.id)) return false;
+      const clientId = (m.metadata as Record<string, unknown>)?.client_id as string | undefined;
+      if (clientId && realClientIds.has(clientId)) return false;
+      const ts = Math.floor(new Date(m.created_at).getTime() / 10_000);
+      return !realFingerprints.has(`${m.role}::${m.content}::${ts}`);
+    });
     return [...real, ...extras];
   }, [messages, optimisticMessages]);
 
@@ -296,6 +326,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         setSending(true);
 
         const tempId = `opt-${Date.now()}`;
+        const clientId = `cli-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         setOptimisticMessages((prev) => [
           ...prev,
           {
@@ -305,7 +336,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
             created_at: new Date().toISOString(),
             phase: "discovery",
             project_id: id,
-            metadata: {},
+            metadata: { client_id: clientId },
           },
         ]);
 
@@ -313,7 +344,13 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
           try {
             const { error: insertError } = await supabase
               .from("conversations")
-              .insert({ project_id: id, role: "user", content: syntheticText, phase: "discovery" });
+              .insert({
+                project_id: id,
+                role: "user",
+                content: syntheticText,
+                phase: "discovery",
+                metadata: { client_id: clientId },
+              });
             if (insertError) throw insertError;
             setIsTyping(true);
 
@@ -331,12 +368,20 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
               return;
             }
 
-            const { reply, phase: respPhase } = invokeData as {
-              reply: string;
-              phase: string;
-              is_complete: boolean;
+            const { reply, phase: respPhase } = (invokeData ?? {}) as {
+              reply?: string;
+              phase?: string;
+              is_complete?: boolean;
               spec_data?: Record<string, string | number | boolean | null>;
             };
+
+            const trimmedReply = typeof reply === "string" ? reply.trim() : "";
+            if (!trimmedReply) {
+              toast.error("The AI architect returned an empty reply. Please try again.");
+              queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+              setSending(false);
+              return;
+            }
 
             // Display reply optimistically
             const tempAssistantId = `opt-assistant-${Date.now()}`;
@@ -345,7 +390,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
               {
                 id: tempAssistantId,
                 role: "assistant",
-                content: reply,
+                content: trimmedReply,
                 created_at: new Date().toISOString(),
                 phase: respPhase || "discovery",
                 project_id: id,
@@ -374,6 +419,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     setSending(true);
 
     const tempId = `opt-${Date.now()}`;
+    const clientId = `cli-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setOptimisticMessages((prev) => [
       ...prev,
       {
@@ -383,14 +429,20 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         created_at: new Date().toISOString(),
         phase: "discovery",
         project_id: id,
-        metadata: {},
+        metadata: { client_id: clientId },
       },
     ]);
 
     try {
       const { error: insertError } = await supabase
         .from("conversations")
-        .insert({ project_id: id, role: "user", content: text, phase: "discovery" });
+        .insert({
+          project_id: id,
+          role: "user",
+          content: text,
+          phase: "discovery",
+          metadata: { client_id: clientId },
+        });
       if (insertError) throw insertError;
       setIsTyping(true);
 
@@ -407,12 +459,22 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         return;
       }
 
-      const { reply, phase, is_complete } = invokeData as {
-        reply: string;
-        phase: string;
-        is_complete: boolean;
+      const { reply, phase, is_complete } = (invokeData ?? {}) as {
+        reply?: string;
+        phase?: string;
+        is_complete?: boolean;
         spec_data?: Record<string, string | number | boolean | null>;
       };
+
+      const trimmedReply = typeof reply === "string" ? reply.trim() : "";
+      if (!trimmedReply) {
+        // n8n returned 200 with an empty body — treat as upstream hiccup rather
+        // than render a ghost assistant bubble.
+        toast.error("The AI architect returned an empty reply. Please try again.");
+        setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
+        queryClient.invalidateQueries({ queryKey: ["conversations", id] });
+        return;
+      }
 
       // Display reply optimistically
       const tempAssistantId = `opt-assistant-${Date.now()}`;
@@ -421,7 +483,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
         {
           id: tempAssistantId,
           role: "assistant",
-          content: reply,
+          content: trimmedReply,
           created_at: new Date().toISOString(),
           phase: phase || "discovery",
           project_id: id,
@@ -509,7 +571,16 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${project.name.replace(/\s+/g, "-").toLowerCase()}-conversation.md`;
+    // Sanitize: alphanumeric + dash/underscore only. Prevents weird characters
+    // (slashes, quotes, unicode homoglyphs) from creating invalid filenames
+    // on Windows or in some email clients.
+    const safeName = project.name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9_-]/g, "")
+      .replace(/-+/g, "-")
+      .slice(0, 80) || "project";
+    a.download = `${safeName}-conversation.md`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Conversation exported!");
@@ -791,8 +862,13 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
                 style={{ height: "auto", overflow: "hidden" }}
                 onInput={(e) => {
                   const t = e.currentTarget;
-                  t.style.height = "auto";
-                  t.style.height = Math.min(t.scrollHeight, 128) + "px";
+                  // Pasting a large block fires onInput synchronously and the
+                  // layout recalc it triggers stutters the thread. Defer to
+                  // next frame so we only resize once per paint.
+                  requestAnimationFrame(() => {
+                    t.style.height = "auto";
+                    t.style.height = Math.min(t.scrollHeight, 128) + "px";
+                  });
                 }}
               />
               <Button

@@ -3,6 +3,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import { Copy, Check, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -202,7 +203,11 @@ export const AssistantMessage = memo(
     };
 
     const handleCopy = async () => {
-      await navigator.clipboard.writeText(content);
+      const ok = await copyToClipboard(content);
+      if (!ok) {
+        toast.error("Couldn't copy. Select the text manually.");
+        return;
+      }
       setCopied(true);
       toast.success("Message copied!");
       setTimeout(() => setCopied(false), 2000);

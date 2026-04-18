@@ -13,7 +13,7 @@ interface ExportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   promptCount: number;
-  onCopyAll: () => Promise<void>;
+  onCopyAll: () => Promise<boolean | void>;
   onDownloadMd: () => void;
   onGoToViewer: () => void;
 }
@@ -27,7 +27,11 @@ const ExportModal = ({
   onGoToViewer,
 }: ExportModalProps) => {
   const handleCopyAll = async () => {
-    await onCopyAll();
+    const ok = await onCopyAll();
+    if (ok === false) {
+      toast.error("Couldn't copy to clipboard. Try downloading instead.");
+      return;
+    }
     toast.success(`All ${promptCount} prompts copied!`);
   };
 

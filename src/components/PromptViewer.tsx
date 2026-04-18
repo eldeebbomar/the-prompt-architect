@@ -24,6 +24,7 @@ import TeamManager from "@/components/TeamManager";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const CATEGORY_COLORS: Record<string, string> = {
   INFRASTRUCTURE: "bg-primary",
@@ -157,12 +158,12 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     setIsPublic(newVal);
     if (newVal) {
       const url = `${window.location.origin}/share/${projectId}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success("Project is now public! Share link copied.");
-      } catch {
-        toast.success("Project is now public! Share link: " + url);
-      }
+      const ok = await copyToClipboard(url);
+      toast.success(
+        ok
+          ? "Project is now public! Share link copied."
+          : `Project is now public! Share link: ${url}`,
+      );
     } else {
       toast.success("Project is now private.");
     }
@@ -220,9 +221,13 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
 
   const handleCopyPrompt = useCallback(
     async (prompt: PromptData) => {
-      await navigator.clipboard.writeText(prompt.prompt_text);
-      markCopied(prompt.id);
-      toast.success("Prompt copied! Paste it into Lovable.");
+      const ok = await copyToClipboard(prompt.prompt_text);
+      if (ok) {
+        markCopied(prompt.id);
+        toast.success("Prompt copied! Paste it into Lovable.");
+      } else {
+        toast.error("Couldn't copy to clipboard. Try selecting the text manually.");
+      }
     },
     [markCopied]
   );
@@ -242,30 +247,40 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     }
   }, []);
 
-  // Keyboard shortcuts for prompt viewer
+  // Keyboard shortcuts for prompt viewer. The listener is registered once on
+  // mount; the handler reads live state from a ref so it never needs to be
+  // re-added when prompts/selection change. (Old code re-added on every
+  // filteredPrompts change — in a busy session that piled up listeners.)
+  const kbStateRef = useRef({ filteredPrompts, selectedPromptId, selectedPrompt, handleCopyPrompt });
+  useEffect(() => {
+    kbStateRef.current = { filteredPrompts, selectedPromptId, selectedPrompt, handleCopyPrompt };
+  }, [filteredPrompts, selectedPromptId, selectedPrompt, handleCopyPrompt]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't intercept when typing in inputs
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
+      const { filteredPrompts: fp, selectedPromptId: spid, selectedPrompt: sp, handleCopyPrompt: cp } =
+        kbStateRef.current;
+
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        const currentIdx = filteredPrompts.findIndex((p) => p.id === (selectedPromptId ?? filteredPrompts[0]?.id));
+        const currentIdx = fp.findIndex((p) => p.id === (spid ?? fp[0]?.id));
         const nextIdx = e.key === "ArrowDown"
-          ? Math.min(currentIdx + 1, filteredPrompts.length - 1)
+          ? Math.min(currentIdx + 1, fp.length - 1)
           : Math.max(currentIdx - 1, 0);
-        if (filteredPrompts[nextIdx]) {
-          setSelectedPromptId(filteredPrompts[nextIdx].id);
+        if (fp[nextIdx]) {
+          setSelectedPromptId(fp[nextIdx].id);
         }
       }
 
-      if (e.key === "Enter" && selectedPromptId) {
+      if (e.key === "Enter" && spid) {
         if (window.innerWidth < 1024) setMobileDetailOpen(true);
       }
 
-      if (e.key === "c" && !e.metaKey && !e.ctrlKey && selectedPrompt) {
-        handleCopyPrompt(selectedPrompt);
+      if (e.key === "c" && !e.metaKey && !e.ctrlKey && sp) {
+        cp(sp);
       }
 
       if (e.key === "Escape") {
@@ -275,7 +290,7 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [filteredPrompts, selectedPromptId, selectedPrompt, handleCopyPrompt]);
+  }, []);
 
   if (isLoading) {
     return (

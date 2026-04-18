@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { fetchN8n, n8nErrorResponse } from "../_shared/n8n.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -8,7 +10,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -23,6 +24,12 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { persistSession: false } },
+    );
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -35,7 +42,13 @@ Deno.serve(async (req) => {
 
     const userId = user.id;
 
-    const { project_id, message } = await req.json();
+    // 1 request per 2 seconds; allows natural typing pace, blocks spam.
+    const throttled = await enforceRateLimit(admin, userId, "discovery", 1, 2, corsHeaders);
+    if (throttled) return throttled;
+
+    const body = await req.json().catch(() => ({}));
+    const project_id = typeof body?.project_id === "string" ? body.project_id : "";
+    const message = typeof body?.message === "string" ? body.message : "";
     if (!project_id || !message) {
       return new Response(
         JSON.stringify({ error: "project_id and message are required" }),
@@ -46,7 +59,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify project ownership
+    // Cheap guard against oversized payloads hitting n8n.
+    if (message.length > 8000) {
+      return new Response(
+        JSON.stringify({ error: "Message too long (max 8000 chars)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { data: ownsIt } = await supabase.rpc("owns_project", {
       _project_id: project_id,
     });
@@ -57,57 +77,38 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Forward to n8n webhook
     const webhookBase = Deno.env.get("N8N_WEBHOOK_BASE");
     if (!webhookBase) {
       return new Response(
         JSON.stringify({ error: "Webhook not configured" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const webhookUrl = `${webhookBase.replace(/\/$/, "")}/webhook/discovery`;
 
-    const n8nResponse = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const result = await fetchN8n(webhookUrl, {
+      timeoutMs: 30_000,
+      headers: { Authorization: authHeader },
+      body: {
         project_id,
         message,
         user_id: userId,
         response_format: "always_include_choices",
-      }),
+      },
     });
 
-    if (!n8nResponse.ok) {
-      const errText = await n8nResponse.text();
-      console.error("n8n webhook error:", n8nResponse.status, errText);
-
-      if (n8nResponse.status === 402) {
+    if (!result.ok) {
+      if (result.status === 402) {
         return new Response(JSON.stringify({ error: "No credits" }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      return new Response(
-        JSON.stringify({ error: "AI architect unavailable" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return n8nErrorResponse(result, corsHeaders);
     }
 
-    const result = await n8nResponse.json();
-
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(result.body), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -115,10 +116,7 @@ Deno.serve(async (req) => {
     console.error("discovery-webhook error:", err);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

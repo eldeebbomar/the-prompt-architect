@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 import { handleWebhookError } from "@/lib/webhook-error-handler";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface KnowledgeBaseModalProps {
   open: boolean;
@@ -93,10 +94,14 @@ const KnowledgeBaseModal = ({
   }, [user, projectId, metadata, onMetadataUpdate]);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(kbText);
-    toast.success(
-      "Knowledge base copied! Paste it into Lovable's Project Settings → Knowledge."
-    );
+    const ok = await copyToClipboard(kbText);
+    if (ok) {
+      toast.success(
+        "Knowledge base copied! Paste it into Lovable's Project Settings → Knowledge."
+      );
+    } else {
+      toast.error("Couldn't copy to clipboard. Select the text manually.");
+    }
   }, [kbText]);
 
   const handleSaveEdit = useCallback(async () => {

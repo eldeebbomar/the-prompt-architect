@@ -52,6 +52,22 @@ export function useRecentProjects(limit = 4) {
   });
 }
 
+export function useAllProjectIds() {
+  return useQuery({
+    queryKey: ["project-ids"],
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id");
+      if (error) throw error;
+      return (data ?? []).map((p) => p.id as string);
+    },
+  });
+}
+
 export function usePromptCount() {
   return useQuery({
     queryKey: ["prompt-count"],

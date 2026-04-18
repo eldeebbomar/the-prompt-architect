@@ -14,24 +14,28 @@
     </div>
 
     <!-- Not linked: pairing code entry -->
-    <div id="link-screen" class="screen hidden">
+    <div id="link-screen" class="screen hidden" role="region" aria-labelledby="link-heading">
       <div class="header">
-        <div class="logo">LP</div>
-        <h1>LovPlan Deployer</h1>
+        <div class="logo" aria-hidden="true">LP</div>
+        <h1 id="link-heading">LovPlan Deployer</h1>
       </div>
       <p class="subtitle">Enter the 6-digit code from your LovPlan account</p>
-      <div class="code-inputs" id="code-inputs">
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="0" />
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="1" />
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="2" />
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="3" />
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="4" />
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="5" />
+      <div class="code-inputs" id="code-inputs" role="group" aria-label="6-digit pairing code">
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="0" aria-label="Digit 1 of 6" autocomplete="one-time-code" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="1" aria-label="Digit 2 of 6" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="2" aria-label="Digit 3 of 6" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="3" aria-label="Digit 4 of 6" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="4" aria-label="Digit 5 of 6" />
+        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="5" aria-label="Digit 6 of 6" />
       </div>
       <button id="link-btn" class="btn-primary" disabled>Link Account</button>
-      <p id="link-error" class="error hidden"></p>
+      <p id="link-error" class="error hidden" role="alert" aria-live="polite"></p>
       <p class="help-text">
-        Get a code at <a href="https://lovplan.app/dashboard/extension" target="_blank">lovplan.app/dashboard/extension</a>
+        Get a code at
+        <a href="https://lovplan.com/dashboard/extension" target="_blank" rel="noopener">lovplan.com/dashboard/extension</a>
+      </p>
+      <p class="help-text help-subtle">
+        Need help? <a href="https://lovplan.com/help" target="_blank" rel="noopener">lovplan.com/help</a>
       </p>
     </div>
 

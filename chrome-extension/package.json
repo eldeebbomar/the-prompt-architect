@@ -1,0 +1,9 @@
+{
+  "name": "lovplan-deployer",
+  "version": "1.0.0",
+  "description": "Auto-deploy LovPlan prompt blueprints to Lovable.dev.",
+  "private": true,
+  "scripts": {
+    "package": "node scripts/package.mjs"
+  }
+}

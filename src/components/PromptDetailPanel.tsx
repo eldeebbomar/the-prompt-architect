@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import type { PromptData } from "@/hooks/use-prompt-export";
 import { getRepeatCount, getAuditTag } from "@/lib/loop-prompt-utils";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const CATEGORY_BADGE_CLASSES: Record<string, string> = {
   INFRASTRUCTURE: "bg-primary/15 text-primary",
@@ -113,9 +114,13 @@ const PromptDetailPanel = ({
     const contextNote = prevInOrder
       ? `// This prompt follows Prompt ${prevInOrder.sequence_order}: "${prevInOrder.title}". The design system and architecture are already set up.\n\n`
       : "";
-    await navigator.clipboard.writeText(contextNote + prompt.prompt_text);
-    onCopy(prompt);
-    toast.success("Prompt copied with context!");
+    const ok = await copyToClipboard(contextNote + prompt.prompt_text);
+    if (ok) {
+      onCopy(prompt);
+      toast.success("Prompt copied with context!");
+    } else {
+      toast.error("Couldn't copy to clipboard.");
+    }
   };
 
   const handleStartEdit = () => {

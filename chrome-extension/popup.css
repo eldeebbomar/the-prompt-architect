@@ -149,6 +149,10 @@ body {
   text-decoration: none;
 }
 .help-text a:hover { text-decoration: underline; }
+.help-subtle {
+  margin-top: 6px;
+  opacity: 0.7;
+}
 
 /* User bar */
 .user-bar {
@@ -296,6 +300,11 @@ h2 {
 .resume-banner .btn-sm {
   padding: 4px 10px;
   font-size: 10px;
+}
+.resume-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 /* Deploy bar */

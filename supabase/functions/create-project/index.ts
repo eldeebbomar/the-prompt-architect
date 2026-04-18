@@ -1,6 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
+// UUID v4 shape. In 2026 every supported browser has crypto.randomUUID, so
+// we expect callers to send real UUIDs. A non-UUID sneaking through just
+// means we generate a fresh one and the retry dedupe doesn't kick in for
+// that one unlucky client — they'll still succeed, just not idempotently.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
@@ -16,7 +23,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Initialize regular client for auth, service role client to bypass RLS for credit deduction atomically
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -38,60 +44,74 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { name, description } = await req.json();
-    if (!name || name.trim() === "") {
+    const body = await req.json().catch(() => ({}));
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    const description =
+      typeof body?.description === "string" ? body.description : "";
+
+    if (!name) {
       return new Response(
         JSON.stringify({ error: "Project name is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // 1. Attempt to deduct credit with service role so it cannot be spoofed by browser
-    const { data: creditOk, error: creditError } = await supabaseAdmin.rpc("deduct_credit", {
-      p_user_id: user.id,
-      p_project_id: null,
-      p_description: `Project: ${name}`,
-    });
-
-    if (creditError) {
-      console.error("Credit deduction error:", creditError);
-      throw creditError;
+    if (name.length > 120) {
+      return new Response(
+        JSON.stringify({ error: "Project name too long (max 120 chars)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (description.length > 2000) {
+      return new Response(
+        JSON.stringify({ error: "Description too long (max 2000 chars)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    if (!creditOk) {
+    // Prefer client-supplied key (dedupes retries); fall back to header; else generate.
+    const headerKey = req.headers.get("Idempotency-Key") ?? "";
+    const bodyKey =
+      typeof body?.idempotency_key === "string" ? body.idempotency_key : "";
+    const candidate = headerKey || bodyKey;
+    const idempotencyKey =
+      candidate && UUID_RE.test(candidate) ? candidate : crypto.randomUUID();
+
+    const { data: result, error: rpcError } = await supabaseAdmin.rpc(
+      "create_project_atomic",
+      {
+        p_user_id: user.id,
+        p_name: name,
+        p_description: description,
+        p_idempotency_key: idempotencyKey,
+      }
+    );
+
+    if (rpcError) {
+      console.error("create_project_atomic error:", rpcError);
+      throw rpcError;
+    }
+
+    if (result?.error === "insufficient_credits") {
       return new Response(
         JSON.stringify({ error: "Insufficient credits" }),
         { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 2. Create the project AFTER credit is successfully docked
-    const { data: project, error: insertError } = await supabase
-      .from("projects")
-      .insert({
-        name,
-        description,
-        user_id: user.id,
-        status: "discovery"
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("Project insert error:", insertError);
-      // Give them their credit back because insertion failed
-      await supabaseAdmin.rpc("add_credits", {
-        p_user_id: user.id,
-        p_amount: 1,
-        p_description: `Refund: Project creation failed`
-      });
-      throw insertError;
-    }
-
-    return new Response(JSON.stringify({ project }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        project: result.project,
+        idempotent_replay: result.idempotent_replay === true,
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+      }
+    );
   } catch (err) {
     console.error("create-project error:", err);
     return new Response(

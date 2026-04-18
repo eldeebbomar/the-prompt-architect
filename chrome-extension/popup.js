@@ -17,8 +17,8 @@ const screens = {
 };
 
 function showScreen(name) {
-  Object.values(screens).forEach((el) => el.classList.add("hidden"));
-  screens[name].classList.remove("hidden");
+  Object.values(screens).forEach((el) => el && el.classList.add("hidden"));
+  screens[name] && screens[name].classList.remove("hidden");
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ let currentProjects = [];
 let currentPrompts = [];
 let selectedProjectId = null;
 let selectedProjectName = "";
+let activeProgressListener = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -38,11 +39,25 @@ async function init() {
 
     if (state.linked) {
       showUserInfo(state.user);
+      const banner = document.getElementById("link-error");
+      if (banner && state.lastError) {
+        banner.textContent = state.lastError;
+        banner.classList.remove("hidden");
+        await sendMessage({ action: "clearLastError" });
+      }
       await loadProjects();
       showScreen("projects");
     } else {
       showScreen("link");
       setupCodeInputs();
+      if (state.lastError) {
+        const errEl = document.getElementById("link-error");
+        if (errEl) {
+          errEl.textContent = state.lastError;
+          errEl.classList.remove("hidden");
+        }
+        await sendMessage({ action: "clearLastError" });
+      }
     }
   } catch {
     showScreen("link");
@@ -52,11 +67,22 @@ async function init() {
 
 init();
 
+window.addEventListener("unload", () => {
+  if (activeProgressListener) {
+    chrome.runtime.onMessage.removeListener(activeProgressListener);
+    activeProgressListener = null;
+  }
+});
+
 // ─── Helper: send message to background ──────────────────────────────────────
 
 function sendMessage(msg) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(msg, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({ error: chrome.runtime.lastError.message });
+        return;
+      }
       resolve(response || { error: "No response" });
     });
   });
@@ -67,6 +93,7 @@ function sendMessage(msg) {
 function setupCodeInputs() {
   const inputs = document.querySelectorAll("#code-inputs input");
   const linkBtn = document.getElementById("link-btn");
+  if (!linkBtn) return;
 
   inputs.forEach((input, idx) => {
     input.addEventListener("input", (e) => {
@@ -87,7 +114,6 @@ function setupCodeInputs() {
       }
     });
 
-    // Support paste of full 6-digit code
     input.addEventListener("paste", (e) => {
       e.preventDefault();
       const pasted = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 6);
@@ -102,12 +128,10 @@ function setupCodeInputs() {
     });
   });
 
-  // Focus first input
   inputs[0]?.focus();
 
   function updateLinkButton() {
-    const code = getCode();
-    linkBtn.disabled = code.length !== 6;
+    linkBtn.disabled = getCode().length !== 6;
   }
 }
 
@@ -116,7 +140,7 @@ function getCode() {
   return Array.from(inputs).map((i) => i.value).join("");
 }
 
-document.getElementById("link-btn").addEventListener("click", async () => {
+document.getElementById("link-btn")?.addEventListener("click", async () => {
   const code = getCode();
   if (code.length !== 6) return;
 
@@ -124,13 +148,23 @@ document.getElementById("link-btn").addEventListener("click", async () => {
   const errEl = document.getElementById("link-error");
   btn.disabled = true;
   btn.textContent = "Linking...";
-  errEl.classList.add("hidden");
+  errEl && errEl.classList.add("hidden");
 
   const result = await sendMessage({ action: "verifyCode", code });
 
   if (result.error) {
-    errEl.textContent = result.error;
-    errEl.classList.remove("hidden");
+    if (errEl) {
+      // Differentiate common error shapes for better UX.
+      const lower = (result.error || "").toLowerCase();
+      if (lower.includes("expired") || lower.includes("invalid")) {
+        errEl.textContent = "Code invalid or expired. Generate a new one from your dashboard.";
+      } else if (result.code === "subscription_required") {
+        errEl.textContent = "The Chrome extension requires a paid plan.";
+      } else {
+        errEl.textContent = result.error;
+      }
+      errEl.classList.remove("hidden");
+    }
     btn.disabled = false;
     btn.textContent = "Link Account";
     return;
@@ -145,23 +179,53 @@ document.getElementById("link-btn").addEventListener("click", async () => {
 
 function showUserInfo(user) {
   if (!user) return;
-  document.getElementById("user-email").textContent = user.email || "";
+  const emailEl = document.getElementById("user-email");
+  if (emailEl) emailEl.textContent = user.email || "";
   const planEl = document.getElementById("user-plan");
+  if (!planEl) return;
   const planLabels = { unlimited: "Unlimited", pack: "5-Pack", "5-pack": "5-Pack", single: "Single" };
   planEl.textContent = planLabels[user.plan] || user.plan || "Paid";
 }
 
 async function loadProjects() {
   const listEl = document.getElementById("project-list");
+  if (!listEl) return;
   listEl.innerHTML = '<div class="spinner"></div>';
 
   const result = await sendMessage({ action: "getProjects" });
   if (result.error) {
-    listEl.innerHTML = `<p class="empty-state">${result.error}</p>`;
+    // 401 from the background clears the token — re-check auth state and
+    // bounce back to the link screen so the user has a way forward.
+    const unauthorized =
+      result.code === "unauthorized" ||
+      result.code === "session_expired" ||
+      /unauthor|session.*(expired|invalid)|re-?link/i.test(result.error || "");
+    if (unauthorized) {
+      const state = await sendMessage({ action: "getAuthState" });
+      if (!state.linked) {
+        showScreen("link");
+        setupCodeInputs();
+        const errEl = document.getElementById("link-error");
+        if (errEl) {
+          errEl.textContent =
+            state.lastError || "Session expired. Please re-link.";
+          errEl.classList.remove("hidden");
+          sendMessage({ action: "clearLastError" });
+        }
+        return;
+      }
+    }
+
+    if (result.code === "subscription_required") {
+      listEl.innerHTML =
+        '<p class="empty-state">Extension access requires an active paid plan. <a href="https://lovplan.com/pricing" target="_blank" rel="noopener">Manage subscription</a>.</p>';
+    } else {
+      listEl.innerHTML = `<p class="empty-state">${escapeHtml(result.error)}</p>`;
+    }
     return;
   }
 
-  currentProjects = result.projects || [];
+  currentProjects = Array.isArray(result.projects) ? result.projects : [];
   if (currentProjects.length === 0) {
     listEl.innerHTML = '<p class="empty-state">No projects with generated prompts yet.</p>';
     return;
@@ -170,18 +234,17 @@ async function loadProjects() {
   listEl.innerHTML = currentProjects
     .map(
       (p) => `
-      <div class="project-card" data-id="${p.id}">
-        <div class="project-name">${escapeHtml(p.name)}</div>
+      <div class="project-card" data-id="${escapeHtml(p.id || "")}">
+        <div class="project-name">${escapeHtml(p.name || "Untitled")}</div>
         <div class="project-meta">
-          <span>${p.prompt_count} prompts</span>
-          <span class="status-pill status-${p.status}">${p.status}</span>
+          <span>${Number(p.prompt_count) || 0} prompts</span>
+          <span class="status-pill status-${escapeHtml(p.status || "")}">${escapeHtml(p.status || "")}</span>
         </div>
       </div>
-    `
+    `,
     )
     .join("");
 
-  // Click handlers
   listEl.querySelectorAll(".project-card").forEach((card) => {
     card.addEventListener("click", () => {
       const id = card.dataset.id;
@@ -191,7 +254,7 @@ async function loadProjects() {
   });
 }
 
-document.getElementById("unlink-btn").addEventListener("click", async () => {
+document.getElementById("unlink-btn")?.addEventListener("click", async () => {
   await sendMessage({ action: "unlink" });
   showScreen("link");
   setupCodeInputs();
@@ -210,27 +273,24 @@ async function openProject(project) {
 
   const result = await sendMessage({ action: "getPrompts", projectId: project.id });
   if (result.error) {
-    listEl.innerHTML = `<p class="empty-state">${result.error}</p>`;
+    listEl.innerHTML = `<p class="empty-state">${escapeHtml(result.error)}</p>`;
     return;
   }
 
-  currentPrompts = result.prompts || [];
+  currentPrompts = Array.isArray(result.prompts) ? result.prompts : [];
   listEl.innerHTML = currentPrompts
     .map(
       (p) => `
       <div class="prompt-item">
-        <span class="prompt-seq">${p.sequence_order}</span>
-        <span class="prompt-title">${escapeHtml(p.title)}</span>
-        ${p.is_loop ? `<span class="loop-badge">Loop x${p.repeat_count || 2}</span>` : ""}
+        <span class="prompt-seq">${escapeHtml(String(p.sequence_order ?? ""))}</span>
+        <span class="prompt-title">${escapeHtml(p.title || "")}</span>
+        ${p.is_loop ? `<span class="loop-badge">Loop x${Number(p.repeat_count) || 2}</span>` : ""}
       </div>
-    `
+    `,
     )
     .join("");
 
-  // Check for saved deployment progress and show resume option
   await checkResumeState();
-
-  // Check if we're on a lovable.dev tab
   await updateDeployButton();
 }
 
@@ -242,40 +302,89 @@ async function checkResumeState() {
   const resumeEl = document.getElementById("resume-banner");
   if (!resumeEl) return;
 
-  if (saved && saved.lastCompletedIndex < saved.total - 1) {
-    resumeEl.innerHTML = `
-      <p>Previous deployment stopped at prompt ${saved.lastCompletedIndex + 1}/${saved.total}</p>
-      <div style="display:flex;gap:6px;margin-top:6px;">
-        <button id="resume-deploy-btn" class="btn btn-primary btn-sm">Resume from #${saved.lastCompletedIndex + 2}</button>
-        <button id="discard-resume-btn" class="btn btn-ghost btn-sm">Start Over</button>
-      </div>
-    `;
-    resumeEl.classList.remove("hidden");
+  // Validate saved state: must be a real object with an index in range.
+  const promptTotal = currentPrompts.length;
+  const isValidResume =
+    saved &&
+    typeof saved === "object" &&
+    Number.isFinite(saved.lastCompletedIndex) &&
+    saved.lastCompletedIndex >= 0 &&
+    saved.lastCompletedIndex < promptTotal - 1 &&
+    Number.isFinite(saved.total) &&
+    saved.total === promptTotal;
 
-    document.getElementById("resume-deploy-btn").addEventListener("click", () => {
+  if (isValidResume) {
+    // Build via DOM API, not innerHTML, so there is zero way for stored
+    // values to ever be interpreted as markup even if the validator upstream
+    // drifts.
+    resumeEl.textContent = "";
+
+    const p = document.createElement("p");
+    p.textContent = `Previous deployment stopped at prompt ${saved.lastCompletedIndex + 1}/${saved.total}`;
+
+    const actions = document.createElement("div");
+    actions.className = "resume-actions";
+
+    const resumeBtn = document.createElement("button");
+    resumeBtn.id = "resume-deploy-btn";
+    resumeBtn.className = "btn btn-primary btn-sm";
+    resumeBtn.textContent = `Resume from #${saved.lastCompletedIndex + 2}`;
+    resumeBtn.addEventListener("click", () => {
       resumeEl.classList.add("hidden");
       startDeploy(saved.lastCompletedIndex + 1);
     });
-    document.getElementById("discard-resume-btn").addEventListener("click", async () => {
+
+    const discardBtn = document.createElement("button");
+    discardBtn.id = "discard-resume-btn";
+    discardBtn.className = "btn btn-ghost btn-sm";
+    discardBtn.textContent = "Start Over";
+    discardBtn.addEventListener("click", async () => {
       await chrome.storage.local.remove(resumeKey);
       resumeEl.classList.add("hidden");
     });
+
+    actions.appendChild(resumeBtn);
+    actions.appendChild(discardBtn);
+    resumeEl.appendChild(p);
+    resumeEl.appendChild(actions);
+    resumeEl.classList.remove("hidden");
   } else {
+    if (saved) {
+      // Drop any stale/mismatched state so it doesn't accumulate.
+      await chrome.storage.local.remove(resumeKey);
+    }
     resumeEl.classList.add("hidden");
   }
+}
+
+async function getLovableTab() {
+  // Two passes: (1) preferred — active tab in the current window that
+  // matches lovable.dev; (2) fallback — any lovable.dev tab, anywhere.
+  // Returned Tab objects don't carry a `currentWindow` field, so we query
+  // with that filter instead of post-filtering.
+  const matchUrls = ["https://lovable.dev/*"];
+
+  const active = await chrome.tabs.query({
+    url: matchUrls,
+    active: true,
+    currentWindow: true,
+  });
+  if (active.length) return active[0];
+
+  const anyLovable = await chrome.tabs.query({ url: matchUrls });
+  if (!anyLovable.length) return null;
+
+  const anyActive = anyLovable.find((t) => t.active);
+  return anyActive || anyLovable[0];
 }
 
 async function updateDeployButton() {
   const btn = document.getElementById("deploy-btn");
   const note = document.getElementById("deploy-note");
+  if (!btn || !note) return;
 
-  const tabs = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-    url: ["https://lovable.dev/*", "https://*.lovable.dev/*"],
-  });
-
-  if (tabs.length > 0) {
+  const tab = await getLovableTab();
+  if (tab) {
     btn.disabled = false;
     note.classList.add("hidden");
   } else {
@@ -285,23 +394,44 @@ async function updateDeployButton() {
   }
 }
 
-document.getElementById("back-btn").addEventListener("click", () => {
+document.getElementById("back-btn")?.addEventListener("click", () => {
   showScreen("projects");
 });
 
-document.getElementById("deploy-btn").addEventListener("click", () => startDeploy(0));
+document.getElementById("deploy-btn")?.addEventListener("click", () => startDeploy(0));
 
 // ─── Deploy ───────────────────────────────────────────────────────────────────
 
 let isPaused = false;
 
-async function getLovableTab() {
-  const tabs = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-    url: ["https://lovable.dev/*", "https://*.lovable.dev/*"],
+async function pingTab(tabId, timeoutMs = 500) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    chrome.tabs.sendMessage(tabId, { action: "ping" }, (response) => {
+      clearTimeout(timer);
+      if (chrome.runtime.lastError || !response) {
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
   });
-  return tabs.length > 0 ? tabs[0] : null;
+}
+
+async function ensureContentScript(tabId) {
+  if (await pingTab(tabId)) return true;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"],
+    });
+  } catch (err) {
+    console.warn("[popup] injectScript failed:", err);
+    return false;
+  }
+  // Give the freshly-injected script a beat to register its listener.
+  await new Promise((r) => setTimeout(r, 150));
+  return pingTab(tabId);
 }
 
 async function startDeploy(startFromIndex) {
@@ -309,33 +439,50 @@ async function startDeploy(startFromIndex) {
 
   isPaused = false;
   const pauseBtn = document.getElementById("pause-deploy-btn");
-  pauseBtn.textContent = "Pause";
+  if (pauseBtn) pauseBtn.textContent = "Pause";
 
   showScreen("deploy");
   const headingEl = document.getElementById("deploy-heading");
   const statusEl = document.getElementById("deploy-status");
   const fillEl = document.getElementById("progress-fill");
-  headingEl.textContent = "Deploying...";
-  statusEl.textContent = startFromIndex > 0 ? `Resuming from prompt #${startFromIndex + 1}...` : "Connecting to Lovable...";
-  fillEl.style.width = "0%";
+  if (headingEl) headingEl.textContent = "Deploying...";
+  if (statusEl) {
+    statusEl.textContent =
+      startFromIndex > 0 ? `Resuming from prompt #${startFromIndex + 1}...` : "Connecting to Lovable...";
+  }
+  if (fillEl) fillEl.style.width = "0%";
 
   const tab = await getLovableTab();
   if (!tab) {
-    statusEl.textContent = "Error: No Lovable tab found.";
+    if (statusEl) statusEl.textContent = "Error: No Lovable tab found.";
+    return;
+  }
+
+  const ready = await ensureContentScript(tab.id);
+  if (!ready) {
+    if (statusEl) {
+      statusEl.textContent =
+        "Error: Could not connect to Lovable page. Refresh the Lovable tab and try again.";
+    }
     return;
   }
 
   const resumeKey = `deploy_progress_${selectedProjectId}`;
 
-  // Listen for progress updates from content script
+  if (activeProgressListener) {
+    chrome.runtime.onMessage.removeListener(activeProgressListener);
+    activeProgressListener = null;
+  }
+
   const progressListener = (message) => {
     if (message.action === "deployProgress") {
       const pct = Math.round((message.current / message.total) * 100);
-      fillEl.style.width = `${pct}%`;
-      statusEl.textContent = `Queuing prompt ${message.current}/${message.total}: ${message.title}`;
-      if (!isPaused) headingEl.textContent = "Deploying...";
+      if (fillEl) fillEl.style.width = `${pct}%`;
+      if (statusEl) {
+        statusEl.textContent = `Queuing prompt ${message.current}/${message.total}: ${message.title}`;
+      }
+      if (!isPaused && headingEl) headingEl.textContent = "Deploying...";
 
-      // Persist progress for resume
       chrome.storage.local.set({
         [resumeKey]: {
           projectId: selectedProjectId,
@@ -347,32 +494,32 @@ async function startDeploy(startFromIndex) {
     }
     if (message.action === "deployComplete") {
       chrome.runtime.onMessage.removeListener(progressListener);
-      // Clear saved progress on completion
+      activeProgressListener = null;
       chrome.storage.local.remove(resumeKey);
       showScreen("complete");
-      document.getElementById("complete-summary").textContent =
-        `${currentPrompts.length} prompts deployed to ${selectedProjectName}`;
+      const summary = document.getElementById("complete-summary");
+      if (summary) {
+        summary.textContent = `${currentPrompts.length} prompts deployed to ${selectedProjectName}`;
+      }
 
-      // Report completion to main app backend
       sendMessage({
         action: "reportDeployComplete",
         projectId: selectedProjectId,
         promptCount: currentPrompts.length,
       }).catch(() => {
-        // Non-critical — don't block the complete screen
         console.warn("Failed to report deploy completion to backend");
       });
     }
     if (message.action === "deployError") {
       chrome.runtime.onMessage.removeListener(progressListener);
-      statusEl.textContent = `Error: ${message.error}`;
-      // Progress is persisted — user can resume later
+      activeProgressListener = null;
+      if (statusEl) statusEl.textContent = `Error: ${message.error}`;
     }
   };
 
+  activeProgressListener = progressListener;
   chrome.runtime.onMessage.addListener(progressListener);
 
-  // Send deploy command to content script
   try {
     await chrome.tabs.sendMessage(tab.id, {
       action: "deploy",
@@ -381,12 +528,16 @@ async function startDeploy(startFromIndex) {
       startFromIndex: startFromIndex || 0,
     });
   } catch (err) {
-    statusEl.textContent = "Error: Could not connect to Lovable page. Refresh and try again.";
+    if (statusEl) {
+      statusEl.textContent =
+        "Error: Could not connect to Lovable page. Refresh and try again.";
+    }
+    chrome.runtime.onMessage.removeListener(progressListener);
+    activeProgressListener = null;
   }
 }
 
-// Pause / Resume
-document.getElementById("pause-deploy-btn").addEventListener("click", async () => {
+document.getElementById("pause-deploy-btn")?.addEventListener("click", async () => {
   const tab = await getLovableTab();
   if (!tab) return;
 
@@ -395,27 +546,30 @@ document.getElementById("pause-deploy-btn").addEventListener("click", async () =
 
   if (!isPaused) {
     isPaused = true;
-    pauseBtn.textContent = "Resume";
-    headingEl.textContent = "Paused";
+    if (pauseBtn) pauseBtn.textContent = "Resume";
+    if (headingEl) headingEl.textContent = "Paused";
     chrome.tabs.sendMessage(tab.id, { action: "pauseDeploy" });
   } else {
     isPaused = false;
-    pauseBtn.textContent = "Pause";
-    headingEl.textContent = "Deploying...";
+    if (pauseBtn) pauseBtn.textContent = "Pause";
+    if (headingEl) headingEl.textContent = "Deploying...";
     chrome.tabs.sendMessage(tab.id, { action: "resumeDeploy" });
   }
 });
 
-// Cancel
-document.getElementById("cancel-deploy-btn").addEventListener("click", async () => {
+document.getElementById("cancel-deploy-btn")?.addEventListener("click", async () => {
   const tab = await getLovableTab();
   if (tab) {
     chrome.tabs.sendMessage(tab.id, { action: "cancelDeploy" });
   }
+  if (activeProgressListener) {
+    chrome.runtime.onMessage.removeListener(activeProgressListener);
+    activeProgressListener = null;
+  }
   showScreen("prompts");
 });
 
-document.getElementById("done-btn").addEventListener("click", () => {
+document.getElementById("done-btn")?.addEventListener("click", () => {
   showScreen("projects");
 });
 
@@ -423,6 +577,6 @@ document.getElementById("done-btn").addEventListener("click", () => {
 
 function escapeHtml(str) {
   const div = document.createElement("div");
-  div.textContent = str;
+  div.textContent = str == null ? "" : String(str);
   return div.innerHTML;
 }

@@ -50,10 +50,35 @@ serve(async (req: Request) => {
     crypto.getRandomValues(bytes);
     const token = Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 
-    // Create extension session
-    const { error: sessionError } = await admin
+    // Reject link attempts from users without a paid plan.
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("id, email, plan, full_name, payment_failed")
+      .eq("id", linkCode.user_id)
+      .maybeSingle();
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({ error: "User not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (profile.plan === "free" || profile.payment_failed === true) {
+      return new Response(
+        JSON.stringify({
+          error: "Subscription required to link the extension",
+          code: "subscription_required",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: sessionRow, error: sessionError } = await admin
       .from("extension_sessions")
-      .insert({ token, user_id: linkCode.user_id });
+      .insert({ token, user_id: linkCode.user_id })
+      .select("expires_at")
+      .single();
 
     if (sessionError) {
       console.error("Failed to create session:", sessionError);
@@ -63,21 +88,15 @@ serve(async (req: Request) => {
       );
     }
 
-    // Fetch user profile for the response
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("id, email, plan, full_name")
-      .eq("id", linkCode.user_id)
-      .single();
-
     return new Response(
       JSON.stringify({
         token,
+        expires_at: sessionRow?.expires_at,
         user: {
-          id: profile?.id,
-          email: profile?.email,
-          plan: profile?.plan,
-          full_name: profile?.full_name,
+          id: profile.id,
+          email: profile.email,
+          plan: profile.plan,
+          full_name: profile.full_name,
         },
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
