@@ -47,7 +47,7 @@ const AcceptInvite = () => {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <SEO title="Accept Invite" />
+      <SEO title="Accept Invite" description="Accept a LovPlan project collaboration invite." noindex />
       <div className="max-w-sm rounded-card border border-border bg-card p-10 text-center">
         {status === "loading" && (
           <>

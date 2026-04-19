@@ -14,7 +14,7 @@ const NotFound = () => {
 
   return (
     <div className="blueprint-grid flex min-h-screen flex-col items-center justify-center px-4">
-      <SEO title="Page Not Found" />
+      <SEO title="Page Not Found" description="The page you're looking for doesn't exist." noindex />
       <p
         className="font-heading text-[120px] leading-none text-primary select-none"
         style={{ textShadow: "0 4px 24px hsl(38 76% 56% / 0.25)" }}

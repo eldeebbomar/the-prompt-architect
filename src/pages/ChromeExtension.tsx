@@ -118,7 +118,7 @@ const ChromeExtension = () => {
 
   return (
     <>
-      <SEO title="Chrome Extension — LovPlan" description="Link your Chrome Extension to deploy prompts to Lovable." />
+      <SEO title="Chrome Extension" description="Link your Chrome Extension to deploy prompts to Lovable." noindex />
       <div className="mx-auto max-w-[640px] space-y-10">
         {/* Header */}
         <section>
