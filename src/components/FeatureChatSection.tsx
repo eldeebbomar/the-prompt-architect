@@ -35,8 +35,8 @@ const phases = [1, 2, 3, 4, 5];
 
 const FeatureChatSection = () => {
   return (
-    <section className="container py-24">
-      <div className="flex flex-col gap-12 lg:flex-row lg:items-center lg:gap-16">
+    <section className="container py-16 md:py-24">
+      <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
         {/* Left — Chat preview */}
         <ScrollReveal className="lg:w-[55%]" delay={0}>
           <div

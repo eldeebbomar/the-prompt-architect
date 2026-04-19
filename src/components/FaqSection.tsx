@@ -39,7 +39,7 @@ const faqs = [
 
 const FaqSection = () => {
   return (
-    <section className="container py-24">
+    <section className="container py-16 md:py-24">
       <ScrollReveal className="mx-auto max-w-2xl text-center">
         <p className="mb-4 font-body text-xs font-medium uppercase tracking-[0.15em] text-primary">
           FAQ
@@ -49,7 +49,7 @@ const FaqSection = () => {
         </h2>
       </ScrollReveal>
 
-      <ScrollReveal delay={100} className="mx-auto mt-14 max-w-[720px]">
+      <ScrollReveal delay={100} className="mx-auto mt-10 max-w-[720px] md:mt-14">
         <Accordion type="single" collapsible defaultValue="item-0">
           {faqs.map((faq, i) => (
             <AccordionItem
@@ -57,10 +57,10 @@ const FaqSection = () => {
               value={`item-${i}`}
               className="mb-3 overflow-hidden rounded-card border border-border bg-card data-[state=open]:border-l-[3px] data-[state=open]:border-l-primary"
             >
-              <AccordionTrigger className="px-6 py-5 font-heading text-base text-foreground hover:no-underline [&>svg]:text-muted-foreground">
+              <AccordionTrigger className="px-5 py-4 text-left font-heading text-base text-foreground hover:no-underline md:px-6 md:py-5 [&>svg]:text-muted-foreground">
                 {faq.q}
               </AccordionTrigger>
-              <AccordionContent className="px-6 pb-5 font-body text-sm font-light leading-relaxed text-muted-foreground">
+              <AccordionContent className="px-5 pb-4 font-body text-sm font-light leading-relaxed text-muted-foreground md:px-6 md:pb-5">
                 {faq.a}
               </AccordionContent>
             </AccordionItem>
