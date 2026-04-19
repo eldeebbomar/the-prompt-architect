@@ -11,6 +11,7 @@ import RouteErrorBoundary from "@/components/RouteErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import DashboardLayout from "./components/DashboardLayout";
 import QuickSearch from "./components/QuickSearch";
+import HeartLogo from "./components/HeartLogo";
 
 // Lazy-loaded routes
 const Index = lazy(() => import("./pages/Index"));
