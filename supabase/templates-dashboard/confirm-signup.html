@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>Confirm your LovPlan email</title>
+</head>
+<body style="margin:0;padding:0;background-color:#1A1512;font-family:'Outfit',system-ui,-apple-system,'Segoe UI',sans-serif;color:#3A2E28;">
+  <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">
+    Confirm your email to activate your free credit and start building on LovPlan.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#1A1512;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#FAF7F2;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.12);">
+
+          <tr>
+            <td align="center" style="background-color:#1A1512;padding:28px 32px;border-bottom:3px solid #D4952A;">
+              <div style="font-family:'DM Serif Display',Georgia,serif;font-size:28px;font-weight:400;color:#D4952A;letter-spacing:-0.5px;line-height:1;">
+                LovPlan
+              </div>
+              <div style="font-family:'Outfit',system-ui,sans-serif;font-size:12px;color:#8A7A6A;letter-spacing:2px;text-transform:uppercase;margin-top:6px;">
+                Prompt architect for Lovable
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:48px 40px 16px 40px;">
+              <h1 style="font-family:'DM Serif Display',Georgia,serif;font-size:32px;font-weight:400;color:#1A1512;margin:0 0 16px 0;line-height:1.2;">
+                Welcome to LovPlan
+              </h1>
+              <p style="font-family:'Outfit',system-ui,sans-serif;font-size:16px;line-height:1.6;color:#3A2E28;margin:0 0 20px 0;">
+                You're one step away from turning a rough app idea into 50+ Lovable-ready prompts. Confirm your email to activate your free credit and start building.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:16px 40px 8px 40px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="#D4952A" style="border-radius:8px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank"
+                       style="display:inline-block;padding:14px 36px;font-family:'Outfit',system-ui,sans-serif;font-size:16px;font-weight:600;color:#1A1512;text-decoration:none;border-radius:8px;min-height:44px;line-height:1.2;mso-line-height-rule:exactly;mso-padding-alt:14px 36px;">
+                      Confirm email
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 40px 8px 40px;">
+              <p style="font-family:'Outfit',system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6B5F58;margin:0 0 8px 0;">
+                Button not working? Copy and paste this link into your browser:
+              </p>
+              <p style="font-family:'Outfit',system-ui,sans-serif;font-size:13px;line-height:1.5;color:#D4952A;word-break:break-all;margin:0;">
+                <a href="{{ .ConfirmationURL }}" target="_blank" style="color:#D4952A;text-decoration:underline;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:32px 40px 16px 40px;">
+              <div style="border-top:1px solid #E8E0D5;"></div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:0 40px 40px 40px;">
+              <p style="font-family:'Outfit',system-ui,sans-serif;font-size:14px;line-height:1.6;color:#6B5F58;margin:0;">
+                If you didn't create a LovPlan account, you can safely ignore this email &mdash; no account will be activated without confirmation.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="background-color:#1A1512;padding:24px 32px;">
+              <p style="font-family:'Outfit',system-ui,sans-serif;font-size:12px;line-height:1.6;color:#8A7A6A;margin:0 0 6px 0;">
+                Sent to {{ .Email }} by LovPlan &mdash; your prompt architect for Lovable.
+              </p>
+              <p style="font-family:'Outfit',system-ui,sans-serif;font-size:12px;line-height:1.6;color:#8A7A6A;margin:0;">
+                <span style="color:#D4952A;">lovplan.com</span>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
