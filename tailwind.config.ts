@@ -107,6 +107,12 @@ export default {
           "0%, 100%": { transform: "translateY(0px)" },
           "50%": { transform: "translateY(-8px)" },
         },
+        "heartbeat": {
+          "0%, 100%": { transform: "scale(1)", opacity: "0.9" },
+          "20%": { transform: "scale(1.12)", opacity: "1" },
+          "40%": { transform: "scale(0.98)", opacity: "0.95" },
+          "60%": { transform: "scale(1.08)", opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -116,6 +122,7 @@ export default {
         "slide-in-right": "slide-in-right 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         "grid-pulse": "grid-pulse 8s ease-in-out infinite",
         "float": "float 6s ease-in-out infinite",
+        "heartbeat": "heartbeat 1.4s ease-in-out infinite",
       },
     },
   },
