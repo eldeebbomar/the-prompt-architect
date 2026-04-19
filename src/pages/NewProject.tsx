@@ -219,6 +219,7 @@ const NewProject = () => {
 
   return (
     <div className="flex justify-center py-8">
+      <SEO title="New Project" description="Start a new LovPlan project. Describe your idea and our AI architect will craft a structured prompt blueprint." noindex />
       <div className="w-full max-w-[560px]">
         {/* Header */}
         <div className="mb-8 flex items-center gap-3">

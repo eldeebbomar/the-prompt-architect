@@ -358,6 +358,7 @@ const ProjectRevision = () => {
 
   return (
     <>
+      <SEO title="Revise Prompts" description="Refine and revise your LovPlan prompt blueprint with AI assistance." noindex />
       <Dialog open={limitModalOpen} onOpenChange={setLimitModalOpen}>
         <DialogContent className="border-border bg-card sm:max-w-[420px]">
           <DialogHeader>

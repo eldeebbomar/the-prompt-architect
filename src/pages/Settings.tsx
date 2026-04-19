@@ -221,6 +221,7 @@ const Settings = () => {
 
   return (
     <>
+      <SEO title="Account Settings" description="Manage your LovPlan profile, account preferences, and security." noindex />
       {/* Delete confirmation dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="border-border bg-card sm:max-w-[440px]">

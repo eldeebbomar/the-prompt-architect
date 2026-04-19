@@ -679,6 +679,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   return (
     <>
+      <SEO title={activeProject?.name ? `${activeProject.name}` : "Project"} description="LovPlan project workspace — discovery chat and AI-generated prompt blueprint." noindex />
       {/* Clear & Restart confirm dialog */}
       <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
         <DialogContent className="max-w-sm border-border bg-card">

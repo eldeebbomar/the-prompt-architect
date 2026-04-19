@@ -124,6 +124,7 @@ const MyProjects = () => {
 
   return (
     <div className="space-y-6">
+      <SEO title="My Projects" description="View, manage, and organize all of your LovPlan prompt blueprints." noindex />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-heading text-[28px] text-foreground">My Projects</h1>

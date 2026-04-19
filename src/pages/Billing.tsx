@@ -67,6 +67,7 @@ const Billing = () => {
 
   return (
     <div className="space-y-8">
+      <SEO title="Credits & Billing" description="Manage your LovPlan credits, subscription, and payment history." noindex />
       <h1 className="font-heading text-[28px] text-foreground">Credits & Billing</h1>
 
       {/* Payment failed banner */}
