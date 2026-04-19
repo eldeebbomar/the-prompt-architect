@@ -91,9 +91,9 @@ const DashboardLayout = () => {
       <div className="flex h-16 items-center justify-between border-b border-border px-4">
         <Link to="/dashboard" className="flex items-center gap-2" onClick={() => isMobile && setMobileOpen(false)}>
           {collapsed && !isMobile ? (
-            <span className="font-heading text-lg tracking-[0.05em] text-primary">LP</span>
+            <img src="/favicon-512.png" alt="Lovplan" width={28} height={28} className="h-7 w-7" />
           ) : (
-            <span className="font-heading text-xl tracking-[0.05em] text-primary">LovPlan</span>
+            <img src="/logo-options/wordmark-1-serif-v2.png" alt="Lovplan" width={140} height={36} className="h-8 w-auto" />
           )}
         </Link>
         {!isMobile && (
