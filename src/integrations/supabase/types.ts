@@ -426,16 +426,7 @@ export type Database = {
         Returns: undefined
       }
       apply_referral: {
-        Args: { p_user_id: string; p_referral_code: string }
-        Returns: Json
-      }
-      create_project_atomic: {
-        Args: {
-          p_user_id: string
-          p_name: string
-          p_description: string
-          p_idempotency_key: string
-        }
+        Args: { p_new_user_id: string; p_referral_code: string }
         Returns: Json
       }
       check_credits: { Args: { p_user_id: string }; Returns: number }
