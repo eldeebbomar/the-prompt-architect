@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import SEO from "@/components/SEO";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Send, PanelRightOpen, FolderOpen, Loader2, Settings2, Download, RotateCcw, ArrowDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";

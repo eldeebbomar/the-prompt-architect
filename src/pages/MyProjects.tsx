@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import SEO from "@/components/SEO";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Compass, MoreVertical, Trash2, Copy, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";

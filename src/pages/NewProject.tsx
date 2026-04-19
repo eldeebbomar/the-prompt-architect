@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import SEO from "@/components/SEO";
 import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { Rocket, Coins, Sparkles, LayoutTemplate, PenLine } from "lucide-react";

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import SEO from "@/components/SEO";
 import { Camera, Loader2, Gift, Copy, Check, Key, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
