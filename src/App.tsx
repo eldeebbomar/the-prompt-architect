@@ -46,9 +46,10 @@ const queryClient = new QueryClient({
 
 const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
-    <div className="text-center">
-      <p className="font-heading text-xl text-primary">LovPlan</p>
-      <div className="mt-4 h-0.5 w-32 overflow-hidden rounded-full bg-muted mx-auto">
+    <div className="flex flex-col items-center text-center">
+      <HeartLogo animated className="h-14 w-14" />
+      <p className="mt-4 font-heading text-xl tracking-[0.05em] text-primary">Lovplan</p>
+      <div className="mt-4 h-0.5 w-32 overflow-hidden rounded-full bg-muted">
         <div className="h-full w-8 animate-[loading-bar_1.2s_ease-in-out_infinite] rounded-full bg-primary" />
       </div>
     </div>
