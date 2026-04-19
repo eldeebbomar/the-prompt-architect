@@ -1,17 +1,19 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import HeartLogo from "@/components/HeartLogo";
 
 const FullPageLoader = () => (
   <div
     className="flex min-h-screen flex-col items-center justify-center bg-background"
     role="status"
     aria-live="polite"
-    aria-label="Loading LovPlan"
+    aria-label="Loading Lovplan"
   >
-    <p className="font-heading text-3xl tracking-[0.05em] text-primary mb-8">
-      LovPlan
+    <HeartLogo animated className="h-16 w-16" />
+    <p className="mt-5 font-heading text-3xl tracking-[0.05em] text-primary">
+      Lovplan
     </p>
-    <div className="relative h-0.5 w-48 overflow-hidden rounded-full bg-border">
+    <div className="relative mt-6 h-0.5 w-48 overflow-hidden rounded-full bg-border">
       <div
         className="absolute top-0 h-full w-2 rounded-full bg-primary"
         style={{ animation: "loading-dot 1.2s ease-in-out infinite alternate" }}
