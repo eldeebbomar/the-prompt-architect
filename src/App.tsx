@@ -16,6 +16,8 @@ import QuickSearch from "./components/QuickSearch";
 const Index = lazy(() => import("./pages/Index"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const MyProjects = lazy(() => import("./pages/MyProjects"));
 const NewProject = lazy(() => import("./pages/NewProject"));
@@ -76,6 +78,8 @@ const App = () => (
                     <Route path="/" element={<Index />} />
                     <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
                     <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
+                    <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/examples" element={<Examples />} />
                     <Route path="/share/:id" element={<SharedProject />} />
