@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { handleWebhookError } from "@/lib/webhook-error-handler";
 import { format } from "date-fns";
+import SEO from "@/components/SEO";
 
 const typeBadge: Record<string, string> = {
   purchase: "border-secondary/50 text-secondary",
