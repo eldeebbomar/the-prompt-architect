@@ -73,13 +73,19 @@ async function handlePreview(req: Request): Promise<Response> {
 
 // ---------- Resend send ----------
 async function sendViaResend(to: string, subject: string, html: string, text: string): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const apiKey = Deno.env.get('RESEND_API_KEY')
-  if (!apiKey) return { ok: false, error: 'RESEND_API_KEY not configured' }
+  const rawKey = Deno.env.get('RESEND_API_KEY')
+  if (!rawKey) return { ok: false, error: 'RESEND_API_KEY not configured' }
+  // Strip any whitespace/newlines or non-ASCII chars that would make the Authorization header invalid.
+  const apiKey = rawKey.trim().replace(/[^\x20-\x7E]/g, '')
+  if (!apiKey) return { ok: false, error: 'RESEND_API_KEY is empty after sanitization' }
+
+  // Sanitize subject too — Resend rejects non-ASCII headers in some cases, but subject goes in the JSON body so this is just defensive.
+  const safeSubject = subject.replace(/[\r\n]/g, ' ')
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject, html, text }),
+    body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject: safeSubject, html, text }),
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) return { ok: false, error: body?.message || `Resend HTTP ${res.status}` }
