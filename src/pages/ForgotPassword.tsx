@@ -28,7 +28,7 @@ const ForgotPassword = () => {
 
   return (
     <div className="blueprint-grid flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
-      <SEO title="Forgot Password" />
+      <SEO title="Forgot Password" description="Reset your LovPlan account password." noindex />
       <div className="w-full max-w-[420px] rounded-card border border-border bg-card p-12">
         <div className="mb-8 flex justify-center">
           <img src="/logo-options/wordmark-1-serif-v2.png" alt="Lovplan" width={180} height={45} className="h-10 w-auto" />

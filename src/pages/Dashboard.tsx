@@ -129,7 +129,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
-      <SEO title="Dashboard" />
+      <SEO title="Dashboard" description="Your LovPlan dashboard — view credits, recent projects, and start new prompt blueprints." noindex />
       <OnboardingTutorial projectCount={projectCount} isLoading={projectsLoading} />
       <div>
         <h1 className="font-heading text-[28px] text-foreground">

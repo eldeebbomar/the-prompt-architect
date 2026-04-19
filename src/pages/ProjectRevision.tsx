@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import SEO from "@/components/SEO";
 import { useParams, useNavigate } from "react-router-dom";
 import { Send, Check, ArrowLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -358,6 +359,7 @@ const ProjectRevision = () => {
 
   return (
     <>
+      <SEO title="Revise Prompts" description="Refine and revise your LovPlan prompt blueprint with AI assistance." noindex />
       <Dialog open={limitModalOpen} onOpenChange={setLimitModalOpen}>
         <DialogContent className="border-border bg-card sm:max-w-[420px]">
           <DialogHeader>

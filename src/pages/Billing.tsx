@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { handleWebhookError } from "@/lib/webhook-error-handler";
 import { format } from "date-fns";
+import SEO from "@/components/SEO";
 
 const typeBadge: Record<string, string> = {
   purchase: "border-secondary/50 text-secondary",
@@ -67,6 +68,7 @@ const Billing = () => {
 
   return (
     <div className="space-y-8">
+      <SEO title="Credits & Billing" description="Manage your LovPlan credits, subscription, and payment history." noindex />
       <h1 className="font-heading text-[28px] text-foreground">Credits & Billing</h1>
 
       {/* Payment failed banner */}

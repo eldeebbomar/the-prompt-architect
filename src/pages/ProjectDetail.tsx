@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import SEO from "@/components/SEO";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Send, PanelRightOpen, FolderOpen, Loader2, Settings2, Download, RotateCcw, ArrowDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -679,6 +680,7 @@ const DiscoveryChat = ({ project }: { project: NonNullable<ReturnType<typeof use
 
   return (
     <>
+      <SEO title={project?.name ?? "Project"} description="LovPlan project workspace — discovery chat and AI-generated prompt blueprint." noindex />
       {/* Clear & Restart confirm dialog */}
       <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
         <DialogContent className="max-w-sm border-border bg-card">

@@ -57,7 +57,7 @@ const Admin = () => {
 
   return (
     <div className="space-y-8">
-      <SEO title="Admin Dashboard" />
+      <SEO title="Admin Dashboard" description="LovPlan admin platform metrics." noindex />
       <div>
         <h1 className="font-heading text-[28px] text-foreground">Admin Dashboard</h1>
         <p className="mt-1.5 font-body text-sm text-muted-foreground">

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import SEO from "@/components/SEO";
 import { Camera, Loader2, Gift, Copy, Check, Key, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -221,6 +222,7 @@ const Settings = () => {
 
   return (
     <>
+      <SEO title="Account Settings" description="Manage your LovPlan profile, account preferences, and security." noindex />
       {/* Delete confirmation dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="border-border bg-card sm:max-w-[440px]">
