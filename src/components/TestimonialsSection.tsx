@@ -32,7 +32,7 @@ const stats = [
 
 const TestimonialsSection = () => {
   return (
-    <section className="container pt-24 pb-12">
+    <section className="container pt-16 pb-10 md:pt-24 md:pb-12">
       {/* Header */}
       <ScrollReveal className="mx-auto max-w-2xl text-center">
         <p className="mb-4 font-body text-xs font-medium uppercase tracking-[0.15em] text-primary">
@@ -44,7 +44,7 @@ const TestimonialsSection = () => {
       </ScrollReveal>
 
       {/* Cards */}
-      <div className="mt-16 grid gap-6 md:grid-cols-3">
+      <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3 md:gap-6">
         {testimonials.map((t, i) => (
           <ScrollReveal key={t.name} delay={i * 100 + 80}>
             <div className="relative rounded-card border border-border bg-card p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-warm-lg">
@@ -74,8 +74,8 @@ const TestimonialsSection = () => {
       </div>
 
       {/* Stats row */}
-      <ScrollReveal delay={200} className="mt-16">
-        <div className="border-t border-primary/20 pt-12">
+      <ScrollReveal delay={200} className="mt-12 md:mt-16">
+        <div className="border-t border-primary/20 pt-10 md:pt-12">
           <div className="flex flex-col items-center justify-center gap-10 sm:flex-row sm:gap-16">
             {stats.map((s) => (
               <div key={s.label} className="text-center">

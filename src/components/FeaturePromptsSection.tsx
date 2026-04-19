@@ -37,8 +37,8 @@ const categories = [
 
 const FeaturePromptsSection = () => {
   return (
-    <section className="container py-24">
-      <div className="flex flex-col gap-12 lg:flex-row lg:items-center lg:gap-16">
+    <section className="container py-16 md:py-24">
+      <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
         {/* Left — Text */}
         <ScrollReveal className="lg:w-[45%]" delay={0}>
           <p className="mb-3 font-body text-xs font-medium uppercase tracking-[0.15em] text-primary">

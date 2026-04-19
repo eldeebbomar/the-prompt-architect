@@ -114,7 +114,7 @@ const PricingSection = () => {
     }
   };
   return (
-    <section id="pricing" className="container py-24">
+    <section id="pricing" className="container py-16 md:py-24">
       {/* Header */}
       <ScrollReveal className="mx-auto max-w-2xl text-center">
         <p className="mb-4 font-body text-xs font-medium uppercase tracking-[0.15em] text-primary">
@@ -129,11 +129,11 @@ const PricingSection = () => {
       </ScrollReveal>
 
       {/* Cards */}
-      <div className="mx-auto mt-16 grid max-w-4xl gap-6 md:grid-cols-3 md:items-center">
+      <div className="mx-auto mt-12 grid max-w-4xl gap-5 md:mt-16 md:grid-cols-3 md:items-center md:gap-6">
         {plans.map((plan, i) => (
           <ScrollReveal key={plan.name} delay={i * 100 + 80}>
             <div
-              className={`relative rounded-card border p-8 transition-all duration-300 hover:-translate-y-0.5 ${
+              className={`relative rounded-card border p-7 transition-all duration-300 hover:-translate-y-0.5 md:p-8 ${
                 plan.highlighted
                   ? "border-primary bg-[hsl(var(--surface-elevated))] shadow-warm-lg md:-my-4 md:py-10"
                   : "border-border bg-card hover:shadow-warm"

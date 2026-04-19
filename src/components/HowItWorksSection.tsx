@@ -108,7 +108,7 @@ const steps = [
 
 const HowItWorksSection = () => {
   return (
-    <section id="how-it-works" className="container py-24">
+    <section id="how-it-works" className="container py-16 md:py-24">
       {/* Header */}
       <ScrollReveal className="mx-auto max-w-2xl text-center">
         <p className="mb-4 font-body text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
@@ -120,7 +120,7 @@ const HowItWorksSection = () => {
       </ScrollReveal>
 
       {/* Steps */}
-      <div className="relative mt-20 grid gap-12 md:grid-cols-3 md:gap-8">
+      <div className="relative mt-12 grid gap-10 md:mt-20 md:grid-cols-3 md:gap-8 md:gap-y-12">
         {/* Connecting line — desktop horizontal */}
         <div className="absolute left-[16.67%] right-[16.67%] top-7 hidden h-px border-t border-dashed border-primary/30 md:block" />
 
@@ -156,8 +156,8 @@ const HowItWorksSection = () => {
       </div>
 
       {/* Time pill */}
-      <ScrollReveal delay={400} className="mt-16 flex justify-center">
-        <span className="inline-block rounded-button border border-primary/40 px-5 py-2 font-body text-sm text-primary">
+      <ScrollReveal delay={400} className="mt-12 flex justify-center px-2 md:mt-16">
+        <span className="inline-block rounded-button border border-primary/40 px-4 py-2 text-center font-body text-xs text-primary sm:text-sm md:px-5">
           Average time from idea to full prompt blueprint: <span className="font-medium">8 minutes</span>
         </span>
       </ScrollReveal>

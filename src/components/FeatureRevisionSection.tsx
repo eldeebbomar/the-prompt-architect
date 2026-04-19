@@ -10,8 +10,8 @@ const bullets = [
 
 const FeatureRevisionSection = () => {
   return (
-    <section className="container py-24">
-      <div className="flex flex-col gap-12 lg:flex-row lg:items-center lg:gap-16">
+    <section className="container py-16 md:py-24">
+      <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
         {/* Left — Visual panels */}
         <ScrollReveal className="space-y-5 lg:w-[55%]" delay={0}>
           {/* Panel A — Pivot Support */}

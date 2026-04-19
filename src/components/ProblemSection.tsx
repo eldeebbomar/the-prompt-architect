@@ -23,12 +23,12 @@ const ProblemSection = () => {
   return (
     <>
       {/* Amber divider */}
-      <div className="flex justify-center py-20">
+      <div className="flex justify-center py-12 md:py-20">
         <div className="h-px w-2/5 bg-primary/40" />
       </div>
 
       {/* Problem header */}
-      <section className="container pb-20">
+      <section className="container pb-12 md:pb-20">
         <ScrollReveal className="mx-auto max-w-2xl text-center">
           <p className="mb-4 font-body text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
             The Problem
@@ -44,10 +44,10 @@ const ProblemSection = () => {
         </ScrollReveal>
 
         {/* Pain cards */}
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
+        <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3 md:gap-6">
           {painCards.map((card, i) => (
             <ScrollReveal key={card.title} delay={i * 100 + 80}>
-              <div className="rounded-card border border-border bg-card p-7 transition-shadow duration-300 hover:shadow-warm">
+              <div className="rounded-card border border-border bg-card p-6 transition-shadow duration-300 hover:shadow-warm md:p-7">
                 <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-button bg-destructive/10">
                   <card.icon className="h-5 w-5 text-destructive" />
                 </div>
@@ -62,12 +62,12 @@ const ProblemSection = () => {
       </section>
 
       {/* Subtle divider */}
-      <div className="flex justify-center py-8">
+      <div className="flex justify-center py-6 md:py-8">
         <div className="h-px w-1/4 bg-border" />
       </div>
 
       {/* Solution */}
-      <section className="container pb-20">
+      <section className="container pb-12 md:pb-20">
         <ScrollReveal className="mx-auto max-w-2xl text-center">
           <p className="mb-4 font-body text-xs font-medium uppercase tracking-[0.15em] text-primary">
             The Solution
@@ -77,13 +77,13 @@ const ProblemSection = () => {
           </h2>
         </ScrollReveal>
 
-        <ScrollReveal delay={120} className="mx-auto mt-12 max-w-3xl">
-          <div className="flex items-start gap-5 rounded-card border border-border bg-card p-7" style={{ borderLeft: "4px solid hsl(var(--amber))" }}>
+        <ScrollReveal delay={120} className="mx-auto mt-10 max-w-3xl md:mt-12">
+          <div className="flex items-start gap-4 rounded-card border border-border bg-card p-6 md:gap-5 md:p-7" style={{ borderLeft: "4px solid hsl(var(--amber))" }}>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary/15">
               <CheckCircle2 className="h-5 w-5 text-secondary" />
             </div>
             <p className="font-body text-sm font-light leading-relaxed text-muted-foreground" style={{ textWrap: "pretty" }}>
-              <span className="font-normal text-foreground">LovPlan interviews you about your idea</span>, understands your stack, then generates 50+ prompts in the exact right order — infrastructure first, features second, polish last. Like having a senior developer plan your entire build.
+              <span className="font-normal text-foreground">Lovplan interviews you about your idea</span>, understands your stack, then generates 50+ prompts in the exact right order — infrastructure first, features second, polish last. Like having a senior developer plan your entire build.
             </p>
           </div>
         </ScrollReveal>

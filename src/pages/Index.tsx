@@ -47,12 +47,12 @@ const Index = () => {
         }}
       />
       {/* Hero — Asymmetric editorial */}
-      <section className="container relative flex min-h-[calc(100vh-64px)] flex-col gap-12 pt-20 pb-16 lg:flex-row lg:items-center lg:gap-8 lg:pt-0 lg:pb-0">
+      <section className="container relative flex min-h-[calc(100vh-64px)] flex-col gap-10 pt-12 pb-12 sm:pt-16 sm:pb-16 lg:flex-row lg:items-center lg:gap-8 lg:pt-0 lg:pb-0">
         {/* Left column — 55% */}
         <div className="flex flex-col justify-center lg:w-[55%]">
           {/* Pill badge */}
           <div
-            className="mb-6 opacity-0 animate-fade-up"
+            className="mb-5 opacity-0 animate-fade-up sm:mb-6"
             style={{ animationDelay: "0ms" }}
           >
             <span className="inline-block rounded-button border border-primary/50 px-3 py-1 font-body text-[12px] font-medium uppercase tracking-[0.1em] text-primary">
@@ -62,7 +62,7 @@ const Index = () => {
 
           {/* Headline */}
           <h1
-            className="font-heading text-[32px] leading-[1.08] text-foreground opacity-0 animate-fade-up sm:text-[36px] md:text-[56px]"
+            className="font-heading text-[34px] leading-[1.08] text-foreground opacity-0 animate-fade-up sm:text-[42px] md:text-[56px]"
             style={{ animationDelay: "100ms" }}
           >
             Stop prompting blindly.
@@ -72,27 +72,27 @@ const Index = () => {
 
           {/* Subtitle */}
           <p
-            className="mt-6 max-w-[480px] font-body text-lg font-light leading-relaxed text-muted-foreground opacity-0 animate-fade-up"
+            className="mt-5 max-w-[480px] font-body text-base font-light leading-relaxed text-muted-foreground opacity-0 animate-fade-up sm:mt-6 sm:text-lg"
             style={{ animationDelay: "200ms", textWrap: "pretty" }}
           >
-            LovPlan's AI architect interviews you about your idea, then generates 50+ structured, dependency-ordered prompts — so your Lovable app is built right the first time.
+            Lovplan's AI architect interviews you about your idea, then generates 50+ structured, dependency-ordered prompts — so your Lovable app is built right the first time.
           </p>
 
           {/* Buttons */}
           <div
-            className="mt-10 flex flex-col gap-3 opacity-0 animate-fade-up sm:flex-row sm:gap-4"
+            className="mt-8 flex flex-col gap-3 opacity-0 animate-fade-up sm:mt-10 sm:flex-row sm:gap-4"
             style={{ animationDelay: "300ms" }}
           >
-            <Link to="/signup">
-              <Button variant="amber" size="lg" className="gap-2">
+            <Link to="/signup" className="w-full sm:w-auto">
+              <Button variant="amber" size="lg" className="w-full gap-2 sm:w-auto">
                 Start Your First Project <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-            <Link to="/#how-it-works">
+            <Link to="/#how-it-works" className="w-full sm:w-auto">
               <Button
                 variant="outline"
                 size="lg"
-                className="gap-2 border-muted-foreground/30 text-foreground"
+                className="w-full gap-2 border-muted-foreground/30 text-foreground sm:w-auto"
               >
                 <PlayCircle className="h-4 w-4" />
                 See How It Works
@@ -102,7 +102,7 @@ const Index = () => {
 
           {/* Social proof */}
           <div
-            className="mt-10 flex items-center gap-3 opacity-0 animate-fade-up"
+            className="mt-8 flex items-center gap-3 opacity-0 animate-fade-up sm:mt-10"
             style={{ animationDelay: "400ms" }}
           >
             <div className="flex -space-x-2">
@@ -121,8 +121,8 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Right column — 45%, hidden on mobile */}
-        <div className="hidden items-center justify-center sm:flex lg:w-[45%]">
+        {/* Right column — 45%, hidden on mobile/tablet */}
+        <div className="hidden items-center justify-center lg:flex lg:w-[45%]">
           <PromptCardStack />
         </div>
       </section>
@@ -163,12 +163,12 @@ const Index = () => {
       <div className="amber-rule" />
 
       {/* Example Prompts */}
-      <section id="examples" className="container py-24">
+      <section id="examples" className="container py-16 md:py-24">
         <ScrollReveal className="text-center">
           <h2 className="mb-4 font-heading text-3xl text-foreground md:text-4xl">
             Sample prompt output
           </h2>
-          <p className="mx-auto mb-16 max-w-lg font-body text-sm text-muted-foreground">
+          <p className="mx-auto mb-10 max-w-lg font-body text-sm text-muted-foreground md:mb-16">
             Each prompt is production-ready, specific, and designed to build on the last.
           </p>
         </ScrollReveal>
