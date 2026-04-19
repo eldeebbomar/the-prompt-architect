@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Menu, Coins, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import lovplanWordmark from "@/assets/lovplan-wordmark.png";
 import {
   Sheet,
   SheetContent,
@@ -30,8 +31,14 @@ const Navbar = () => {
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-[hsl(var(--nav-border))] bg-[hsl(var(--nav-bg))] backdrop-blur-sm">
       <div className="container flex h-full items-center justify-between">
-        <Link to="/" className="font-heading text-xl tracking-[0.05em] text-primary">
-          LovPlan
+        <Link to="/" className="flex items-center" aria-label="Lovplan home">
+          <img
+            src={lovplanWordmark}
+            alt="Lovplan"
+            width={160}
+            height={40}
+            className="h-8 w-auto md:h-9"
+          />
         </Link>
 
         {/* Desktop nav */}
@@ -98,8 +105,14 @@ const Navbar = () => {
           </SheetTrigger>
           <SheetContent side="right" className="border-l-border bg-card">
             <SheetHeader>
-              <SheetTitle className="font-heading text-xl tracking-[0.05em] text-primary">
-                LovPlan
+              <SheetTitle asChild>
+                <img
+                  src={lovplanWordmark}
+                  alt="Lovplan"
+                  width={160}
+                  height={40}
+                  className="h-9 w-auto"
+                />
               </SheetTitle>
             </SheetHeader>
             <nav className="mt-8 flex flex-col gap-6">

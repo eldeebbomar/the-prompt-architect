@@ -36,9 +36,9 @@ const Login = () => {
       <SEO title="Sign In" />
       <div className="w-full max-w-[420px] rounded-card border border-border bg-card p-12">
         {/* Logo */}
-        <p className="mb-8 text-center font-heading text-2xl tracking-[0.05em] text-primary">
-          LovPlan
-        </p>
+        <div className="mb-8 flex justify-center">
+          <img src="/logo-options/wordmark-1-serif-v2.png" alt="Lovplan" width={180} height={45} className="h-10 w-auto" />
+        </div>
 
         {/* Heading */}
         <h1 className="mb-1 text-center font-heading text-3xl leading-[1.1] text-foreground">

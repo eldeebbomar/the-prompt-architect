@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import ScrollReveal from "@/components/ScrollReveal";
+import lovplanWordmark from "@/assets/lovplan-wordmark.png";
 
 const footerLinks = {
   Product: [
@@ -61,12 +62,19 @@ const CtaFooter = () => {
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             {/* Brand column */}
             <div>
-              <p className="font-heading text-2xl tracking-[0.05em] text-primary">LovPlan</p>
+              <img
+                src={lovplanWordmark}
+                alt="Lovplan"
+                width={180}
+                height={45}
+                loading="lazy"
+                className="h-9 w-auto"
+              />
               <p className="mt-3 max-w-[220px] font-body text-sm font-light leading-relaxed text-muted-foreground">
                 AI-powered prompt blueprints for Lovable builders.
               </p>
               <p className="mt-4 font-body text-xs text-muted-foreground">
-                © 2025 LovPlan. All rights reserved.
+                © 2025 Lovplan. All rights reserved.
               </p>
             </div>
 
