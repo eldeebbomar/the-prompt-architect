@@ -33,20 +33,15 @@ export const SignupEmail = ({
     <Body style={main}>
       <Container style={container}>
         <Text style={logo}>LovPlan</Text>
-        <Heading style={h1}>Welcome aboard!</Heading>
+        <Heading style={h1}>Welcome aboard</Heading>
         <Text style={text}>
           Thanks for signing up for{' '}
           <Link href={siteUrl} style={link}>
             <strong>{siteName}</strong>
           </Link>
-          !
-        </Text>
-        <Text style={text}>
-          Please confirm your email address (
-          <Link href={`mailto:${recipient}`} style={link}>
-            {recipient}
-          </Link>
-          ) by clicking the button below:
+          ! Confirm your email (
+          <Link href={`mailto:${recipient}`} style={link}>{recipient}</Link>
+          ) to get started.
         </Text>
         <Button style={button} href={confirmationUrl}>
           Get Started

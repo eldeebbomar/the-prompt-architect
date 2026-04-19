@@ -242,7 +242,7 @@ async function handleWebhook(req: Request): Promise<Response> {
 
   const messageId = crypto.randomUUID()
 
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes.
+  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
   await supabase.from('email_send_log').insert({
     message_id: messageId,
     template_name: emailType,
@@ -250,59 +250,32 @@ async function handleWebhook(req: Request): Promise<Response> {
     status: 'pending',
   })
 
-  // Retry the enqueue with backoff. Enqueue failures under load are usually
-  // transient (Postgres overload / connection reset); 3 attempts with
-  // increasing backoff has empirically resolved ~all of them.
-  const enqueueAttempts = 3
-  const backoffsMs = [0, 1000, 3000]
-  let enqueueError: unknown = null
-  let succeeded = false
-  for (let attempt = 0; attempt < enqueueAttempts; attempt++) {
-    if (backoffsMs[attempt] > 0) {
-      await new Promise((r) => setTimeout(r, backoffsMs[attempt]))
-    }
-    const result = await supabase.rpc('enqueue_email', {
-      queue_name: 'auth_emails',
-      payload: {
-        run_id,
-        message_id: messageId,
-        to: payload.data.email,
-        from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
-        sender_domain: SENDER_DOMAIN,
-        subject: EMAIL_SUBJECTS[emailType] || 'Notification',
-        html,
-        text,
-        purpose: 'transactional',
-        label: emailType,
-        queued_at: new Date().toISOString(),
-      },
-    })
-    if (!result.error) {
-      succeeded = true
-      break
-    }
-    enqueueError = result.error
-    console.warn(
-      `Failed to enqueue auth email (attempt ${attempt + 1}/${enqueueAttempts})`,
-      { error: result.error, run_id, emailType },
-    )
-  }
-
-  if (!succeeded) {
-    console.error('Failed to enqueue auth email after retries', {
-      error: enqueueError,
+  const { error: enqueueError } = await supabase.rpc('enqueue_email', {
+    queue_name: 'auth_emails',
+    payload: {
       run_id,
-      emailType,
-    })
-    // Update the existing pending row rather than inserting a duplicate —
-    // keeps the audit trail clean on message_id.
-    await supabase
-      .from('email_send_log')
-      .update({ status: 'failed', error_message: 'Failed to enqueue email after retries' })
-      .eq('message_id', messageId)
+      message_id: messageId,
+      to: payload.data.email,
+      from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+      sender_domain: SENDER_DOMAIN,
+      subject: EMAIL_SUBJECTS[emailType] || 'Notification',
+      html,
+      text,
+      purpose: 'transactional',
+      label: emailType,
+      queued_at: new Date().toISOString(),
+    },
+  })
 
-    // Return 500 so Supabase retries the whole hook — otherwise the user
-    // never sees a confirmation email and is stuck in limbo.
+  if (enqueueError) {
+    console.error('Failed to enqueue auth email', { error: enqueueError, run_id, emailType })
+    await supabase.from('email_send_log').insert({
+      message_id: messageId,
+      template_name: emailType,
+      recipient_email: payload.data.email,
+      status: 'failed',
+      error_message: 'Failed to enqueue email',
+    })
     return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
