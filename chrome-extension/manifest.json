@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "LovPlan Deployer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Deploy LovPlan prompts to Lovable.dev automatically. Select a project, click deploy, and watch your prompts get queued.",
-  "permissions": ["storage", "tabs", "scripting"],
+  "permissions": ["storage", "tabs", "scripting", "alarms"],
   "host_permissions": [
     "https://lovable.dev/*",
     "https://gnovkpjawtodjcgizxsh.supabase.co/*"

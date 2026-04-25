@@ -152,6 +152,216 @@ serve(async (req: Request) => {
       );
     }
 
+    // Single-project read — used by the extension on resume to recover state
+    // even when chrome.storage.local has been wiped (e.g. user re-installed,
+    // or different device).
+    const projectMatch = path.match(/^\/projects\/([^/]+)\/?$/);
+    if (projectMatch && req.method === "GET") {
+      const projectId = projectMatch[1];
+
+      const { data: proj, error: projErr } = await admin
+        .from("projects")
+        .select("id, name, status, description, metadata, created_at, updated_at")
+        .eq("id", projectId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (projErr || !proj) {
+        return new Response(
+          JSON.stringify({ error: "Project not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const meta = (typeof proj.metadata === "object" && proj.metadata !== null)
+        ? proj.metadata as Record<string, unknown>
+        : {};
+
+      return new Response(
+        JSON.stringify({
+          project: {
+            id: proj.id,
+            name: proj.name,
+            status: proj.status,
+            description: proj.description,
+            created_at: proj.created_at,
+            updated_at: proj.updated_at,
+            // Promote the deploy-state fields the extension/app care about so
+            // callers don't need to dig through the metadata blob.
+            deploy_state: {
+              last_deployed_index:
+                typeof meta.last_deployed_index === "number" ? meta.last_deployed_index : null,
+              total_prompts:
+                typeof meta.total_prompts === "number" ? meta.total_prompts : null,
+              paused: meta.paused === true,
+              deploy_error: typeof meta.deploy_error === "string" ? meta.deploy_error : null,
+              deploy_error_at: typeof meta.deploy_error_at === "string" ? meta.deploy_error_at : null,
+              last_progress_at: typeof meta.last_progress_at === "string" ? meta.last_progress_at : null,
+              deployed_at: typeof meta.deployed_at === "string" ? meta.deployed_at : null,
+              deployed_via: typeof meta.deployed_via === "string" ? meta.deployed_via : null,
+              deployed_prompt_count:
+                typeof meta.deployed_prompt_count === "number" ? meta.deployed_prompt_count : null,
+            },
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Partial progress upsert. Idempotent — only advances last_deployed_index
+    // unless the caller is explicitly resetting (paused=true keeps the value).
+    const progressMatch = path.match(/^\/projects\/([^/]+)\/deploy-progress\/?$/);
+    if (progressMatch && req.method === "POST") {
+      const projectId = progressMatch[1];
+
+      const { data: proj, error: projErr } = await admin
+        .from("projects")
+        .select("id, status, metadata")
+        .eq("id", projectId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (projErr || !proj) {
+        return new Response(
+          JSON.stringify({ error: "Project not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      let body: { last_deployed_index?: number; total_prompts?: number; paused?: boolean } = {};
+      try { body = await req.json(); } catch { /* empty body */ }
+
+      const existingMeta = (typeof proj.metadata === "object" && proj.metadata !== null)
+        ? proj.metadata as Record<string, unknown>
+        : {};
+
+      // Once a project has been marked deployed we don't accept progress
+      // events — they're stale (probably from an old tab).
+      if (existingMeta.deployed_at) {
+        return new Response(
+          JSON.stringify({ success: true, ignored: "already_completed" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const incomingIndex =
+        typeof body.last_deployed_index === "number" && Number.isFinite(body.last_deployed_index)
+          ? Math.max(0, Math.floor(body.last_deployed_index))
+          : null;
+
+      const totalPrompts =
+        typeof body.total_prompts === "number" && Number.isFinite(body.total_prompts) && body.total_prompts > 0
+          ? Math.floor(body.total_prompts)
+          : (typeof existingMeta.total_prompts === "number" ? existingMeta.total_prompts : null);
+
+      // Monotonic: never let progress slide backwards from a stale message.
+      const existingIndex =
+        typeof existingMeta.last_deployed_index === "number" ? existingMeta.last_deployed_index : -1;
+      const nextIndex =
+        incomingIndex === null ? existingIndex : Math.max(existingIndex, incomingIndex);
+
+      const updatedMeta: Record<string, unknown> = {
+        ...existingMeta,
+        last_deployed_index: nextIndex >= 0 ? nextIndex : null,
+        total_prompts: totalPrompts,
+        last_progress_at: new Date().toISOString(),
+        paused: body.paused === true,
+      };
+      // A successful progress write means there's no active error to surface.
+      delete updatedMeta.deploy_error;
+      delete updatedMeta.deploy_error_at;
+
+      const { error: updErr } = await admin
+        .from("projects")
+        .update({ metadata: updatedMeta })
+        .eq("id", projectId);
+
+      if (updErr) throw updErr;
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          last_deployed_index: nextIndex >= 0 ? nextIndex : null,
+          total_prompts: totalPrompts,
+          paused: body.paused === true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Mid-deploy failure — record the error and the last index that succeeded
+    // so the user can resume from there.
+    const errorMatch = path.match(/^\/projects\/([^/]+)\/deploy-error\/?$/);
+    if (errorMatch && req.method === "POST") {
+      const projectId = errorMatch[1];
+
+      const { data: proj, error: projErr } = await admin
+        .from("projects")
+        .select("id, status, metadata")
+        .eq("id", projectId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (projErr || !proj) {
+        return new Response(
+          JSON.stringify({ error: "Project not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      let body: { error_message?: string; last_deployed_index?: number; error_code?: string } = {};
+      try { body = await req.json(); } catch { /* empty body */ }
+
+      const existingMeta = (typeof proj.metadata === "object" && proj.metadata !== null)
+        ? proj.metadata as Record<string, unknown>
+        : {};
+
+      // Don't poison a completed project's metadata with stale error noise.
+      if (existingMeta.deployed_at) {
+        return new Response(
+          JSON.stringify({ success: true, ignored: "already_completed" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const errorMessage =
+        typeof body.error_message === "string" && body.error_message.trim().length > 0
+          ? body.error_message.slice(0, 500)
+          : "Unknown deploy error";
+
+      const incomingIndex =
+        typeof body.last_deployed_index === "number" && Number.isFinite(body.last_deployed_index)
+          ? Math.max(0, Math.floor(body.last_deployed_index))
+          : null;
+
+      const existingIndex =
+        typeof existingMeta.last_deployed_index === "number" ? existingMeta.last_deployed_index : -1;
+      const nextIndex =
+        incomingIndex === null ? existingIndex : Math.max(existingIndex, incomingIndex);
+
+      const updatedMeta: Record<string, unknown> = {
+        ...existingMeta,
+        last_deployed_index: nextIndex >= 0 ? nextIndex : existingMeta.last_deployed_index ?? null,
+        deploy_error: errorMessage,
+        deploy_error_at: new Date().toISOString(),
+        deploy_error_code: typeof body.error_code === "string" ? body.error_code : null,
+        last_progress_at: new Date().toISOString(),
+        paused: false,
+      };
+
+      const { error: updErr } = await admin
+        .from("projects")
+        .update({ metadata: updatedMeta })
+        .eq("id", projectId);
+
+      if (updErr) throw updErr;
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const deployMatch = path.match(/^\/projects\/([^/]+)\/deploy-complete\/?$/);
     if (deployMatch && req.method === "POST") {
       const projectId = deployMatch[1];
@@ -197,12 +407,19 @@ serve(async (req: Request) => {
           ? body.prompt_count
           : null;
 
-      const updatedMeta = {
-        ...existingMeta,
-        deployed_at: new Date().toISOString(),
-        deployed_via: "chrome_extension",
-        deployed_prompt_count: promptCount,
-      };
+      // Strip the partial-deploy fields on full completion — they no longer
+      // describe truth and would confuse the app's progress UI.
+      const updatedMeta = { ...existingMeta };
+      delete updatedMeta.last_deployed_index;
+      delete updatedMeta.total_prompts;
+      delete updatedMeta.last_progress_at;
+      delete updatedMeta.paused;
+      delete updatedMeta.deploy_error;
+      delete updatedMeta.deploy_error_at;
+      delete updatedMeta.deploy_error_code;
+      updatedMeta.deployed_at = new Date().toISOString();
+      updatedMeta.deployed_via = "chrome_extension";
+      updatedMeta.deployed_prompt_count = promptCount;
 
       const { error: updateErr } = await admin
         .from("projects")

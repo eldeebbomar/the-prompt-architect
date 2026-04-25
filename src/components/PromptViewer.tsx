@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useGeneratedPrompts } from "@/hooks/use-generated-prompts";
 import { usePromptExport, type PromptData } from "@/hooks/use-prompt-export";
+import { useDeployProgress } from "@/hooks/use-deploy-progress";
 import ExportModal from "@/components/ExportModal";
 import KnowledgeBaseModal from "@/components/KnowledgeBaseModal";
 import PromptDetailPanel from "@/components/PromptDetailPanel";
@@ -99,20 +100,33 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
     downloadMarkdown,
   } = usePromptExport(projectId, promptData, localMetadata);
 
-  // Refetch project metadata when user returns to the tab (e.g. after deploying via extension)
+  // Live deploy progress — polls the project metadata while the extension is
+  // actively deploying so the UI ticks along with the user's account state.
+  const { progress: deployProgress, query: deployProgressQuery } = useDeployProgress(
+    projectId,
+    promptData.length,
+  );
+
+  // Keep `localMetadata` in sync with the polled data so other consumers
+  // (KnowledgeBaseModal, the deployedViaExtension flag below) see fresh state.
   useEffect(() => {
-    const handleVisibility = async () => {
-      if (document.visibilityState !== "visible") return;
-      const { data } = await supabase
-        .from("projects")
-        .select("metadata")
-        .eq("id", projectId)
-        .maybeSingle();
-      if (data?.metadata) setLocalMetadata(data.metadata);
+    const fresh = deployProgressQuery.data?.metadata;
+    if (fresh) setLocalMetadata(fresh);
+  }, [deployProgressQuery.data?.metadata]);
+
+  // The polling hook stops once a deploy goes stale (>5 min since last
+  // progress). For the user-pauses-walks-away-comes-back case we still want
+  // a fresh state on visibility change — refetch once when the tab regains
+  // focus. Cheap (single-row query) and only fires on visibility transitions.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        deployProgressQuery.refetch();
+      }
     };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [projectId]);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [deployProgressQuery]);
 
   // Detect extension deployment — mark all prompts as copied
   const metaObj = useMemo(() => {
@@ -130,6 +144,29 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
       deployChecked.current = true;
     }
   }, [deployedViaExtension, promptData.length, markAllCopied]);
+
+  // Reflect partial extension deploys into the local "copied" state. If the
+  // extension reports `last_deployed_index = 39`, prompts 1–40 (sequence_order)
+  // should render as copied so the user sees an honest "stopped at 40 of 50"
+  // view in the account, not the stale pre-deploy state.
+  const lastMarkedDeployIndexRef = useRef<number>(-1);
+  useEffect(() => {
+    if (deployedViaExtension) return; // full-completion path already marks all
+    if (typeof deployProgress.lastDeployedIndex !== "number") return;
+    if (deployProgress.lastDeployedIndex <= lastMarkedDeployIndexRef.current) return;
+
+    const sorted = promptData
+      .slice()
+      .sort((a, b) => a.sequence_order - b.sequence_order);
+    const upTo = Math.min(deployProgress.lastDeployedIndex, sorted.length - 1);
+    // Only mark prompts newer than the last index we already processed —
+    // avoids redundant setState calls on every poll.
+    const startFrom = Math.max(0, lastMarkedDeployIndexRef.current + 1);
+    for (let i = startFrom; i <= upTo; i++) {
+      markCopied(sorted[i].id);
+    }
+    lastMarkedDeployIndexRef.current = deployProgress.lastDeployedIndex;
+  }, [deployProgress.lastDeployedIndex, deployedViaExtension, promptData, markCopied]);
 
   // Fetch current sharing state
   useEffect(() => {
@@ -501,6 +538,74 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
             </div>
           </div>
         </div>
+
+        {/* Deploy progress banner — only when a deploy is in flight, paused, or
+            errored. The "fully completed" case is already conveyed by the
+            "X Prompts Deployed" pill in the header. */}
+        {(deployProgress.hasProgress || deployProgress.isErrored) && !deployProgress.isCompleted && (
+          <div
+            className={`shrink-0 border-b px-4 py-3 md:px-6 ${
+              deployProgress.isErrored
+                ? "border-destructive/40 bg-destructive/10"
+                : deployProgress.isPaused
+                  ? "border-muted-foreground/30 bg-muted/40"
+                  : "border-primary/40 bg-primary/10"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Chrome
+                  className={`h-4 w-4 ${
+                    deployProgress.isErrored
+                      ? "text-destructive"
+                      : deployProgress.isPaused
+                        ? "text-muted-foreground"
+                        : "text-primary"
+                  }`}
+                />
+                <span className="font-body text-sm">
+                  {deployProgress.isErrored ? (
+                    <>
+                      <strong>Deploy stopped</strong> at prompt {deployProgress.deployedCount} of{" "}
+                      {deployProgress.totalCount}
+                      {deployProgress.errorMessage ? `: ${deployProgress.errorMessage}` : "."}
+                    </>
+                  ) : deployProgress.isPaused ? (
+                    <>
+                      <strong>Paused</strong> at prompt {deployProgress.deployedCount} of{" "}
+                      {deployProgress.totalCount}. Resume from your Chrome extension to continue.
+                    </>
+                  ) : deployProgress.isActive ? (
+                    <>
+                      <strong>Deploying</strong> {deployProgress.deployedCount} of{" "}
+                      {deployProgress.totalCount} prompts via the Chrome extension…
+                    </>
+                  ) : (
+                    <>
+                      <strong>Last seen</strong> at prompt {deployProgress.deployedCount} of{" "}
+                      {deployProgress.totalCount}. Open the extension to continue.
+                    </>
+                  )}
+                </span>
+              </div>
+              <span className="font-body text-xs text-muted-foreground">{deployProgress.percent}%</span>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  deployProgress.isErrored
+                    ? "bg-destructive"
+                    : deployProgress.isPaused
+                      ? "bg-muted-foreground"
+                      : "bg-primary"
+                }`}
+                style={{ width: `${deployProgress.percent}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Three-panel layout */}
         <div className="flex flex-1 min-h-0">

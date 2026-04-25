@@ -5,10 +5,24 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 2;
+const SELECTOR_VERSION = 3;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
+// Max time to wait for Lovable to clear the input after a send. If exceeded,
+// either the send didn't go through or Lovable's UI hung — surface as an error
+// rather than concatenate text into the next iteration.
+const POST_SEND_CLEAR_TIMEOUT_MS = 8000;
+const POST_SEND_POLL_INTERVAL_MS = 100;
+// Courtesy gap between sends so we don't hammer Lovable. Tuned small because
+// the cleared-input wait already gates on actual submission.
+const INTER_SEND_COURTESY_MS = 800;
+// Larger gap before the very first send — Lovable's chat sometimes mounts
+// asynchronously after the page settles.
+const FIRST_SEND_PRELUDE_MS = 1500;
+// Cap on prompt size before sending. Both Chrome message-passing and Lovable's
+// own input field have practical limits beyond this.
+const MAX_PROMPT_CHARS = 16000;
 
 // Flip to true in development for verbose step-by-step deploy logs. Kept
 // off in releases so the user's DevTools stays clean.
@@ -162,13 +176,14 @@ function readCurrentValue(element) {
 }
 
 async function insertTextVerified(element, text) {
+  // Check first 32 chars (substring match) so emojis / multi-byte chars that
+  // render with different code-unit lengths still verify correctly.
+  const probe = text.slice(0, Math.min(32, text.length));
   for (let attempt = 0; attempt < INSERT_VERIFY_ATTEMPTS; attempt++) {
     insertText(element, text);
     await delay(INSERT_VERIFY_DELAY_MS);
     const current = readCurrentValue(element);
-    // Allow partial match (trailing whitespace differences) — we compare on
-    // the non-whitespace length being non-zero and similar.
-    if (current.length > 0 && current.length >= Math.min(text.length, 1)) {
+    if (current.length > 0 && (current.includes(probe) || current.length >= Math.min(text.length, 8))) {
       return true;
     }
     console.warn(
@@ -180,6 +195,42 @@ async function insertTextVerified(element, text) {
     );
   }
   return false;
+}
+
+// Wait until Lovable has cleared the input (its signal that the prior submission
+// was accepted). This replaces the prior fixed-delay heuristic that caused
+// repeat-prompt text to concatenate when Lovable was fast OR sends to drop
+// when Lovable was slow.
+async function waitForInputCleared(element, timeoutMs) {
+  const deadline = Date.now() + (timeoutMs || POST_SEND_CLEAR_TIMEOUT_MS);
+  while (Date.now() < deadline) {
+    if (cancelRequested) return false;
+    const current = readCurrentValue(element).trim();
+    if (current.length === 0) return true;
+    await delay(POST_SEND_POLL_INTERVAL_MS);
+  }
+  return false;
+}
+
+// Heuristic Lovable inline-error detection. If Lovable shows a banner like
+// "rate limited", "credit exhausted", "error", we surface that instead of
+// silently advancing through the queue and burning more sends.
+function detectLovableError() {
+  const candidates = [
+    ...document.querySelectorAll('[role="alert"]:not([hidden])'),
+    ...document.querySelectorAll('[data-testid*="error" i]'),
+    ...document.querySelectorAll('[class*="error-banner" i]'),
+    ...document.querySelectorAll('[class*="toast" i][class*="error" i]'),
+  ];
+  for (const el of candidates) {
+    if (!(el instanceof HTMLElement)) continue;
+    if (!el.offsetParent && el.style.display !== "block") continue; // not visible
+    const text = (el.textContent || "").trim();
+    if (!text) continue;
+    // Keep messages reasonable to surface; avoid scraping huge stack traces.
+    return text.length > 240 ? text.slice(0, 240) + "…" : text;
+  }
+  return null;
 }
 
 function waitForInput(timeoutMs) {
@@ -285,19 +336,14 @@ async function sendOnePrompt(index, total, promptText) {
 
 // ─── Deploy orchestration ────────────────────────────────────────────────────
 
+// Returns { value, clamped } so the caller can collect a warning to surface.
 function normalizeRepeatCount(raw) {
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 1) return 1;
+  if (!Number.isFinite(n) || n < 1) return { value: 1, clamped: false };
   if (n > MAX_REPEAT_COUNT) {
-    console.warn(
-      "[LovPlan Deployer] clamping repeat_count from " +
-        n +
-        " to " +
-        MAX_REPEAT_COUNT,
-    );
-    return MAX_REPEAT_COUNT;
+    return { value: MAX_REPEAT_COUNT, clamped: true, original: n };
   }
-  return Math.floor(n);
+  return { value: Math.floor(n), clamped: false };
 }
 
 function isPromptValid(p) {
@@ -336,23 +382,41 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
       return (a.sequence_order || 0) - (b.sequence_order || 0);
     });
 
+  const warnings = [];
   const expanded = [];
   for (let s = 0; s < sorted.length; s++) {
     const p = sorted[s];
+    let promptText = p.prompt_text;
+    if (typeof promptText === "string" && promptText.length > MAX_PROMPT_CHARS) {
+      warnings.push(
+        `Prompt #${p.sequence_order ?? s + 1} truncated from ${promptText.length} to ${MAX_PROMPT_CHARS} chars.`,
+      );
+      promptText = promptText.slice(0, MAX_PROMPT_CHARS);
+    }
     if (p.is_loop) {
-      const count = normalizeRepeatCount(p.repeat_count);
+      const norm = normalizeRepeatCount(p.repeat_count);
+      if (norm.clamped) {
+        warnings.push(
+          `Prompt #${p.sequence_order ?? s + 1} repeat capped at ${MAX_REPEAT_COUNT} (was ${norm.original}).`,
+        );
+      }
+      const count = norm.value;
       for (let r = 0; r < count; r++) {
         expanded.push({
           title:
             p.title +
             (count > 1 ? " (repeat " + (r + 1) + "/" + count + ")" : ""),
-          prompt_text: p.prompt_text,
+          prompt_text: promptText,
           sequence_order: p.sequence_order,
         });
       }
     } else {
-      expanded.push(p);
+      expanded.push({ ...p, prompt_text: promptText });
     }
+  }
+
+  if (warnings.length) {
+    chrome.runtime.sendMessage({ action: "deployWarning", warnings });
   }
 
   const total = expanded.length;
@@ -380,6 +444,10 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
       (resumeIdx > 0 ? " (resuming from index " + resumeIdx + ")" : ""),
   );
 
+  // Brief settle before the very first send — Lovable's chat sometimes mounts
+  // asynchronously after the page reports ready.
+  if (resumeIdx === 0) await delay(FIRST_SEND_PRELUDE_MS);
+
   for (let i = resumeIdx; i < total; i++) {
     await waitWhilePaused();
     if (cancelRequested) {
@@ -399,8 +467,52 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
       const ok = await sendOnePrompt(i + 1, total, prompt.prompt_text);
       if (!ok) return;
 
-      const waitTime = i === 0 ? 3000 : 1500;
-      await delay(waitTime);
+      // Event-driven wait: Lovable clears the input when it accepts a
+      // submission. Polling for that is the most reliable cross-version
+      // signal that one repeat actually went through before firing the next.
+      // This is the fix for the "repeating not working" bug — the prior
+      // fixed delay caused text concatenation on fast Lovable responses.
+      const inputAfter = getChatInput();
+      if (inputAfter) {
+        const cleared = await waitForInputCleared(inputAfter);
+        if (cancelRequested) return;
+        if (!cleared) {
+          const lovableError = detectLovableError();
+          chrome.runtime.sendMessage({
+            action: "deployError",
+            error:
+              lovableError
+                ? `Lovable error after prompt ${i + 1}: ${lovableError}`
+                : `Prompt ${i + 1} did not submit (input never cleared). Lovable may be slow or rate-limiting.`,
+            lastCompletedIndex: Math.max(0, i - 1),
+          });
+          return;
+        }
+      }
+
+      // Even on a clean clear, check for a freshly-mounted error banner —
+      // Lovable can accept submission then surface "rate limit" inline.
+      const lovableError = detectLovableError();
+      if (lovableError) {
+        chrome.runtime.sendMessage({
+          action: "deployError",
+          error: `Lovable error after prompt ${i + 1}: ${lovableError}`,
+          lastCompletedIndex: i,
+        });
+        return;
+      }
+
+      // Confirmed-completed event — popup persists this as resume truth.
+      // (deployProgress fires *before* send for UI feedback; this is the
+      // authoritative "this prompt is done" signal.)
+      chrome.runtime.sendMessage({
+        action: "deployStepCompleted",
+        completedIndex: i,
+        total,
+      });
+
+      // Small courtesy gap so we don't pummel Lovable.
+      await delay(INTER_SEND_COURTESY_MS);
     } catch (err) {
       console.error(
         "[LovPlan Deployer] [" + (i + 1) + "/" + total + "] Error:",
@@ -409,13 +521,14 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
       chrome.runtime.sendMessage({
         action: "deployError",
         error: "Failed on prompt " + (i + 1) + ": " + err.message,
+        lastCompletedIndex: Math.max(0, i - 1),
       });
       return;
     }
   }
 
   dlog("Deployment complete!");
-  chrome.runtime.sendMessage({ action: "deployComplete" });
+  chrome.runtime.sendMessage({ action: "deployComplete", total });
 }
 
 // ─── Message Listener ─────────────────────────────────────────────────────────

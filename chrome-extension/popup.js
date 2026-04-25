@@ -329,7 +329,27 @@ async function checkResumeState() {
     resumeBtn.id = "resume-deploy-btn";
     resumeBtn.className = "btn btn-primary btn-sm";
     resumeBtn.textContent = `Resume from #${saved.lastCompletedIndex + 2}`;
-    resumeBtn.addEventListener("click", () => {
+    resumeBtn.addEventListener("click", async () => {
+      // Pre-flight: if the session token expired while paused, route to the
+      // link screen with a clear message and preserve the resume index so
+      // it auto-resumes after re-link.
+      const me = await sendMessage({ action: "getMe" });
+      if (me.error) {
+        const unauthorized =
+          me.code === "unauthorized" ||
+          me.code === "session_expired" ||
+          /unauthor|session.*(expired|invalid)|re-?link/i.test(me.error || "");
+        if (unauthorized) {
+          showScreen("link");
+          setupCodeInputs();
+          const errEl = document.getElementById("link-error");
+          if (errEl) {
+            errEl.textContent = "Your link expired — re-link to resume your deploy.";
+            errEl.classList.remove("hidden");
+          }
+          return;
+        }
+      }
       resumeEl.classList.add("hidden");
       startDeploy(saved.lastCompletedIndex + 1);
     });
@@ -474,7 +494,11 @@ async function startDeploy(startFromIndex) {
     activeProgressListener = null;
   }
 
+  const warningEl = document.getElementById("deploy-warnings");
+
   const progressListener = (message) => {
+    // UI-only update — pre-send announcement. Resume state comes from the
+    // authoritative deployStepCompleted event below.
     if (message.action === "deployProgress") {
       const pct = Math.round((message.current / message.total) * 100);
       if (fillEl) fillEl.style.width = `${pct}%`;
@@ -482,16 +506,34 @@ async function startDeploy(startFromIndex) {
         statusEl.textContent = `Queuing prompt ${message.current}/${message.total}: ${message.title}`;
       }
       if (!isPaused && headingEl) headingEl.textContent = "Deploying...";
+    }
 
+    // Authoritative confirmation that one prompt was accepted by Lovable.
+    // Only this event drives resume-state localStorage writes.
+    if (message.action === "deployStepCompleted") {
       chrome.storage.local.set({
         [resumeKey]: {
           projectId: selectedProjectId,
-          lastCompletedIndex: message.current - 1,
+          lastCompletedIndex: message.completedIndex,
           total: message.total,
           timestamp: Date.now(),
         },
       });
     }
+
+    // Surface clamping / truncation warnings collected during deploy setup.
+    if (message.action === "deployWarning" && Array.isArray(message.warnings)) {
+      if (warningEl) {
+        warningEl.textContent = "";
+        message.warnings.forEach((w) => {
+          const li = document.createElement("li");
+          li.textContent = w;
+          warningEl.appendChild(li);
+        });
+        warningEl.classList.remove("hidden");
+      }
+    }
+
     if (message.action === "deployComplete") {
       chrome.runtime.onMessage.removeListener(progressListener);
       activeProgressListener = null;
@@ -501,24 +543,41 @@ async function startDeploy(startFromIndex) {
       if (summary) {
         summary.textContent = `${currentPrompts.length} prompts deployed to ${selectedProjectName}`;
       }
-
-      sendMessage({
-        action: "reportDeployComplete",
-        projectId: selectedProjectId,
-        promptCount: currentPrompts.length,
-      }).catch(() => {
-        console.warn("Failed to report deploy completion to backend");
-      });
+      // Backend reporting is now owned by background.js (it stays alive when
+      // the popup closes). Popup no longer calls reportDeployComplete here.
     }
+
     if (message.action === "deployError") {
       chrome.runtime.onMessage.removeListener(progressListener);
       activeProgressListener = null;
       if (statusEl) statusEl.textContent = `Error: ${message.error}`;
+      // Persist whatever index content reported so resume offers the right
+      // restart point even though deployStepCompleted may not have fired
+      // for the failing iteration.
+      if (typeof message.lastCompletedIndex === "number" && message.lastCompletedIndex >= 0) {
+        chrome.storage.local.set({
+          [resumeKey]: {
+            projectId: selectedProjectId,
+            lastCompletedIndex: message.lastCompletedIndex,
+            total: currentPrompts.length,
+            timestamp: Date.now(),
+          },
+        });
+      }
     }
   };
 
   activeProgressListener = progressListener;
   chrome.runtime.onMessage.addListener(progressListener);
+
+  // Tell background to take ownership of progress reporting + keepalive +
+  // tab-close monitoring. This survives the popup closing mid-deploy.
+  await sendMessage({
+    action: "startDeployTracking",
+    projectId: selectedProjectId,
+    tabId: tab.id,
+    total: currentPrompts.length,
+  });
 
   try {
     await chrome.tabs.sendMessage(tab.id, {
@@ -537,9 +596,25 @@ async function startDeploy(startFromIndex) {
   }
 }
 
-document.getElementById("pause-deploy-btn")?.addEventListener("click", async () => {
+// Send a control message to the tab the deploy was actually started on
+// (locked in background.activeDeploy.tabId). Falling back to getLovableTab
+// would route to the *currently active* Lovable tab, which can differ if the
+// user switched windows during the deploy — that would silently pause the
+// wrong project.
+async function getDeployTabId() {
+  const state = await sendMessage({ action: "getActiveDeploy" });
+  if (state && state.active && typeof state.tabId === "number") {
+    return state.tabId;
+  }
+  // No active deploy tracked — fall back to the heuristic so the buttons
+  // still do something sensible (e.g., user clicked pause after a hot reload).
   const tab = await getLovableTab();
-  if (!tab) return;
+  return tab?.id ?? null;
+}
+
+document.getElementById("pause-deploy-btn")?.addEventListener("click", async () => {
+  const tabId = await getDeployTabId();
+  if (typeof tabId !== "number") return;
 
   const pauseBtn = document.getElementById("pause-deploy-btn");
   const headingEl = document.getElementById("deploy-heading");
@@ -548,19 +623,19 @@ document.getElementById("pause-deploy-btn")?.addEventListener("click", async () 
     isPaused = true;
     if (pauseBtn) pauseBtn.textContent = "Resume";
     if (headingEl) headingEl.textContent = "Paused";
-    chrome.tabs.sendMessage(tab.id, { action: "pauseDeploy" });
+    chrome.tabs.sendMessage(tabId, { action: "pauseDeploy" });
   } else {
     isPaused = false;
     if (pauseBtn) pauseBtn.textContent = "Pause";
     if (headingEl) headingEl.textContent = "Deploying...";
-    chrome.tabs.sendMessage(tab.id, { action: "resumeDeploy" });
+    chrome.tabs.sendMessage(tabId, { action: "resumeDeploy" });
   }
 });
 
 document.getElementById("cancel-deploy-btn")?.addEventListener("click", async () => {
-  const tab = await getLovableTab();
-  if (tab) {
-    chrome.tabs.sendMessage(tab.id, { action: "cancelDeploy" });
+  const tabId = await getDeployTabId();
+  if (typeof tabId === "number") {
+    chrome.tabs.sendMessage(tabId, { action: "cancelDeploy" });
   }
   if (activeProgressListener) {
     chrome.runtime.onMessage.removeListener(activeProgressListener);
