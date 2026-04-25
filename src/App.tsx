@@ -31,6 +31,8 @@ const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 const Billing = lazy(() => import("./pages/Billing"));
 const SharedProject = lazy(() => import("./pages/SharedProject"));
 const Help = lazy(() => import("./pages/Help"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -86,6 +88,8 @@ const App = () => (
                     <Route path="/examples" element={<Examples />} />
                     <Route path="/share/:id" element={<SharedProject />} />
                     <Route path="/help" element={<Help />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/terms" element={<Terms />} />
                   </Route>
 
                   {/* Dashboard layout with sidebar */}

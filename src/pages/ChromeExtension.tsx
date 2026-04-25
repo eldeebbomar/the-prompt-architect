@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Chrome, Link2, Loader2, Trash2, ArrowUpRight, Shield } from "lucide-react";
+import { Chrome, Link2, Loader2, Trash2, ArrowUpRight, Shield, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,6 +7,7 @@ import { useExtensionSessions, useRevokeSession, useRevokeAllSessions } from "@/
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { handleWebhookError } from "@/lib/webhook-error-handler";
+import { copyToClipboard } from "@/lib/clipboard";
 import { formatDistanceToNow } from "date-fns";
 import SEO from "@/components/SEO";
 
@@ -21,6 +22,19 @@ const ChromeExtension = () => {
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const [codeCopied, setCodeCopied] = useState(false);
+
+  const handleCopyCode = useCallback(async () => {
+    if (!linkCode) return;
+    const ok = await copyToClipboard(linkCode);
+    if (ok) {
+      setCodeCopied(true);
+      toast.success("Code copied — paste it into the extension.");
+      setTimeout(() => setCodeCopied(false), 2000);
+    } else {
+      toast.error("Couldn't copy. Type the code manually.");
+    }
+  }, [linkCode]);
 
   const isFree = (profile?.plan ?? "free") === "free";
 
@@ -139,9 +153,11 @@ const ChromeExtension = () => {
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mx-auto">
               <Shield className="h-8 w-8 text-primary" />
             </div>
-            <h2 className="font-heading text-xl text-foreground">Paid Feature</h2>
-            <p className="font-body text-sm text-muted-foreground max-w-sm mx-auto">
-              The Chrome Extension is available on paid plans. Upgrade to link your extension and auto-deploy prompts to Lovable.
+            <h2 className="font-heading text-xl text-foreground">Available on paid plans</h2>
+            <p className="font-body text-sm text-muted-foreground max-w-md mx-auto">
+              The Chrome extension auto-types your prompts into Lovable on your behalf. It runs
+              against our infrastructure to keep your account linked, so it's available on the
+              Single, 5-Pack, and Unlimited plans.
             </p>
             <Button variant="amber" onClick={() => navigate("/pricing")} className="gap-1.5">
               View Pricing <ArrowUpRight className="h-3.5 w-3.5" />
@@ -174,15 +190,30 @@ const ChromeExtension = () => {
                       {formatCountdown(countdown)}
                     </span>
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-border text-muted-foreground"
-                    onClick={handleGenerateCode}
-                    disabled={generating}
-                  >
-                    {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Generate New Code"}
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                      variant="amber"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={handleCopyCode}
+                    >
+                      {codeCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {codeCopied ? "Copied" : "Copy code"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-border text-muted-foreground"
+                      onClick={() => {
+                        if (window.confirm("This will invalidate the current code. Continue?")) {
+                          handleGenerateCode();
+                        }
+                      }}
+                      disabled={generating}
+                    >
+                      {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Generate New Code"}
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="rounded-card border border-border bg-card p-6 text-center space-y-4">

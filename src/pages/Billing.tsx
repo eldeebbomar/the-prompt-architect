@@ -1,12 +1,19 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Coins, ArrowUpRight, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Coins, ArrowUpRight, Loader2, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreditStats } from "@/hooks/use-credits";
 import { useCreditTransactions } from "@/hooks/use-credit-transactions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { handleWebhookError } from "@/lib/webhook-error-handler";
 import { format } from "date-fns";
@@ -26,6 +33,7 @@ const Billing = () => {
   const { data: txPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: txLoading } =
     useCreditTransactions();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelPreviewOpen, setCancelPreviewOpen] = useState(false);
 
   const isUnlimited = stats?.plan === "unlimited";
   const creditsRemaining = isUnlimited ? null : (stats?.credits_remaining ?? 0);
@@ -157,21 +165,84 @@ const Billing = () => {
             )}
           </div>
           {isUnlimited ? (
-            <Button
-              variant="outline"
-              className="border-border text-muted-foreground hover:text-foreground gap-1.5"
-              onClick={handleManageSubscription}
-              disabled={portalLoading}
-            >
-              {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Manage Subscription"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="border-border text-muted-foreground hover:text-foreground gap-1.5"
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+              >
+                {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Manage Subscription"}
+              </Button>
+              <Button
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => setCancelPreviewOpen(true)}
+              >
+                Cancel
+              </Button>
+            </div>
           ) : (
             <Button variant="amber" onClick={() => navigate("/pricing")} className="gap-1.5">
               Upgrade
             </Button>
           )}
         </div>
+
+        {/* Refund + tax disclosure */}
+        <div className="mt-5 flex items-start gap-2.5 rounded-card border border-border bg-[hsl(var(--surface-elevated))] p-3.5">
+          <Shield className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <p className="font-body text-xs text-muted-foreground leading-relaxed">
+            Credits are auto-refunded if our system fails to generate prompts. Used credits and
+            completed subscription periods are not refundable. Prices exclude VAT; EU customers
+            are charged VAT at checkout. See our{" "}
+            <Link to="/terms" className="text-primary hover:underline">Terms</Link> and{" "}
+            <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+          </p>
+        </div>
       </div>
+
+      {/* Cancel preview modal */}
+      <Dialog open={cancelPreviewOpen} onOpenChange={setCancelPreviewOpen}>
+        <DialogContent className="border-border bg-card sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl text-foreground">
+              Cancel your subscription?
+            </DialogTitle>
+            <DialogDescription className="font-body text-sm text-muted-foreground">
+              You'll keep full access until the end of your current billing period. After that:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="mt-3 space-y-1.5 font-body text-sm text-foreground">
+            <li>• Your plan reverts to <strong>Free</strong>.</li>
+            <li>• The Chrome extension stops working until you re-subscribe.</li>
+            <li>• Existing projects and prompts stay in your account.</li>
+            <li>• Used credits are not refunded for the current period.</li>
+          </ul>
+          <p className="mt-3 font-body text-xs text-muted-foreground">
+            Cancellation is processed in the Stripe billing portal. You can reactivate any time.
+          </p>
+          <div className="mt-5 flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 border-border"
+              onClick={() => setCancelPreviewOpen(false)}
+            >
+              Keep subscription
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => {
+                setCancelPreviewOpen(false);
+                handleManageSubscription();
+              }}
+            >
+              Continue to Stripe
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Section 3 — Transaction History */}
       <div>

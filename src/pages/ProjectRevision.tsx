@@ -408,8 +408,15 @@ const ProjectRevision = () => {
               Revise Prompts
             </h1>
             {!isUnlimited && (
-              <span className="font-body text-[10px] text-muted-foreground">
-                {revisionCount}/{maxRevisions} revisions used
+              <span
+                className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-[11px] font-medium ${
+                  atLimit
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : "border-primary/30 bg-primary/10 text-primary"
+                }`}
+                title="Each message you send counts as one revision. Upgrade for unlimited."
+              >
+                {revisionCount} / {maxRevisions} revisions used
               </span>
             )}
           </div>
@@ -460,10 +467,10 @@ const ProjectRevision = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Describe what you want to change..."
+                  placeholder={atLimit ? "Revision limit reached — upgrade to continue" : "Describe what you want to change..."}
                   rows={1}
-                  disabled={sending}
-                  className="max-h-32 min-h-[44px] flex-1 resize-none rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-primary disabled:opacity-50"
+                  disabled={sending || atLimit}
+                  className="max-h-32 min-h-[44px] flex-1 resize-none rounded-input border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3 font-body text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ height: "auto", overflow: "hidden" }}
                   onInput={(e) => {
                     const t = e.currentTarget;

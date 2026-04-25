@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import SEO from "@/components/SEO";
+import lovplanWordmark from "@/assets/lovplan-wordmark.png";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
@@ -67,7 +68,7 @@ const Signup = () => {
       <SEO title="Sign Up" />
       <div className="w-full max-w-[420px] rounded-card border border-border bg-card p-12">
         <div className="mb-8 flex justify-center">
-          <img src="/logo-options/wordmark-1-serif-v2.png" alt="Lovplan" width={180} height={45} className="h-10 w-auto" />
+          <img src={lovplanWordmark} alt="Lovplan" width={180} height={45} className="h-10 w-auto" />
         </div>
 
         <h1 className="mb-1 text-center font-heading text-3xl leading-[1.1] text-foreground">
@@ -135,7 +136,10 @@ const Signup = () => {
           <Link to="/login" className="text-primary hover:underline">Sign in</Link>
         </p>
         <p className="mt-4 text-center font-body text-[11px] text-muted-foreground">
-          By signing up you agree to our Terms and Privacy.
+          By signing up you agree to our{" "}
+          <Link to="/terms" className="text-primary hover:underline">Terms</Link>
+          {" "}and{" "}
+          <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
         </p>
       </div>
     </div>

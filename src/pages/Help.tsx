@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Rocket, Chrome, CreditCard, HelpCircle, ChevronDown, FileText, MessageSquare, ArrowRight } from "lucide-react";
+import { Rocket, Chrome, CreditCard, HelpCircle, ChevronDown, FileText, MessageSquare, ArrowRight, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SEO from "@/components/SEO";
 
@@ -176,11 +176,16 @@ const Help = () => {
         <MessageSquare className="mx-auto mb-3 h-8 w-8 text-primary" />
         <h3 className="font-heading text-lg text-foreground">Still need help?</h3>
         <p className="mt-2 font-body text-sm text-muted-foreground max-w-sm mx-auto">
-          Can't find what you're looking for? Start a new project and our AI discovery chat will guide you through every step.
+          Can't find an answer here? Email us and we usually reply within 1 business day.
         </p>
-        <div className="mt-5 flex items-center justify-center gap-3">
-          <Link to="/dashboard/new">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+          <a href="mailto:support@lovplan.com">
             <Button variant="amber" className="gap-1.5">
+              <Mail className="h-4 w-4" /> Email support@lovplan.com
+            </Button>
+          </a>
+          <Link to="/dashboard/new">
+            <Button variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10">
               <FileText className="h-4 w-4" /> Start a Project
             </Button>
           </Link>

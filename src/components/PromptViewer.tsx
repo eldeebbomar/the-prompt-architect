@@ -376,19 +376,24 @@ const PromptViewer = ({ projectId, projectName, metadata }: PromptViewerProps) =
 
   if (!promptData.length) {
     return (
-      <div className="flex h-[calc(100vh-64px)] items-center justify-center">
-        <div className="w-full max-w-[400px] text-center">
+      <div className="flex h-[calc(100vh-64px)] items-center justify-center px-4">
+        <div className="w-full max-w-[460px] text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-primary/50" />
-          <h2 className="font-heading text-xl text-foreground">No prompts generated yet</h2>
+          <h2 className="font-heading text-xl text-foreground">No prompts to show</h2>
           <p className="mt-2 font-body text-sm text-muted-foreground">
-            Complete the discovery phase first to generate your prompt blueprint.
+            If you finished discovery but landed here, generation may not have completed.
+            Head back to discovery to start a fresh generation, or email{" "}
+            <a href="mailto:support@lovplan.com" className="text-primary hover:underline">
+              support@lovplan.com
+            </a>{" "}
+            and we'll look at your project.
           </p>
           <Button
             variant="amber"
             className="mt-5"
             onClick={() => navigate(`/project/${projectId}`)}
           >
-            Go to Discovery
+            Back to Discovery
           </Button>
         </div>
       </div>

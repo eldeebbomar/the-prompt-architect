@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import SEO from "@/components/SEO";
-import { Camera, Loader2, Gift, Copy, Check, Key, Trash2 } from "lucide-react";
+import { Camera, Loader2, Gift, Copy, Check, Key, Trash2, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,53 @@ const Settings = () => {
     }
   };
 
+  // Notification preferences — fetched on mount, persisted on toggle.
+  const [notifPrefs, setNotifPrefs] = useState<{
+    marketing: boolean;
+    productUpdates: boolean;
+    loaded: boolean;
+  }>({ marketing: true, productUpdates: true, loaded: false });
+
+  useEffect(() => {
+    if (!user) return;
+    (supabase as any)
+      .from("profiles")
+      .select("marketing_email_optin, product_update_optin")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        setNotifPrefs({
+          marketing: data?.marketing_email_optin ?? true,
+          productUpdates: data?.product_update_optin ?? true,
+          loaded: true,
+        });
+      });
+  }, [user]);
+
+  const handleToggleNotif = async (
+    field: "marketing_email_optin" | "product_update_optin",
+    value: boolean,
+  ) => {
+    if (!user) return;
+    // Optimistic update so the toggle feels instant.
+    setNotifPrefs((s) => ({
+      ...s,
+      ...(field === "marketing_email_optin" ? { marketing: value } : { productUpdates: value }),
+    }));
+    const { error } = await (supabase as any)
+      .from("profiles")
+      .update({ [field]: value })
+      .eq("id", user.id);
+    if (error) {
+      // Revert.
+      setNotifPrefs((s) => ({
+        ...s,
+        ...(field === "marketing_email_optin" ? { marketing: !value } : { productUpdates: !value }),
+      }));
+      toast.error("Couldn't update preference. Try again.");
+    }
+  };
+
   const handleRevokeApiKey = async (keyId: string) => {
     try {
       const { error } = await supabase.functions.invoke("manage-api-key", {
@@ -124,6 +172,50 @@ const Settings = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<{
+    projects: number;
+    prompts: number;
+    credits: number;
+    plan: string;
+    loading: boolean;
+  }>({ projects: 0, prompts: 0, credits: 0, plan: "free", loading: false });
+
+  // Fetch real counts when the delete dialog opens so the consequences shown
+  // reflect this user's actual data, not generic warning copy.
+  useEffect(() => {
+    if (!deleteOpen || !user) return;
+    setDeleteImpact((s) => ({ ...s, loading: true }));
+    (async () => {
+      try {
+        const [{ count: projectCount }, { count: promptCount }, { data: profileRow }] =
+          await Promise.all([
+            (supabase as any)
+              .from("projects")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", user.id),
+            (supabase as any)
+              .from("generated_prompts")
+              .select("id, projects!inner(user_id)", { count: "exact", head: true })
+              .eq("projects.user_id", user.id),
+            (supabase as any)
+              .from("profiles")
+              .select("credits, plan")
+              .eq("id", user.id)
+              .maybeSingle()
+              .then((r: any) => ({ data: r.data })),
+          ]);
+        setDeleteImpact({
+          projects: projectCount ?? 0,
+          prompts: promptCount ?? 0,
+          credits: profileRow?.credits ?? 0,
+          plan: profileRow?.plan ?? "free",
+          loading: false,
+        });
+      } catch {
+        setDeleteImpact({ projects: 0, prompts: 0, credits: 0, plan: "free", loading: false });
+      }
+    })();
+  }, [deleteOpen, user]);
 
   const avatarUrl = profile?.avatar_url;
 
@@ -225,16 +317,54 @@ const Settings = () => {
       <SEO title="Account Settings" description="Manage your LovPlan profile, account preferences, and security." noindex />
       {/* Delete confirmation dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="border-border bg-card sm:max-w-[440px]">
+        <DialogContent className="border-border bg-card sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl text-destructive">
-              Delete Account
+              Delete account
             </DialogTitle>
             <DialogDescription className="font-body text-sm text-muted-foreground">
-              This will permanently delete your account, all projects, and all
-              generated prompts. This cannot be undone.
+              This permanently removes everything below. There is no undo.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="mt-2 rounded-card border border-destructive/30 bg-destructive/5 p-4">
+            <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-destructive">
+              You will lose
+            </p>
+            {deleteImpact.loading ? (
+              <p className="font-body text-sm text-muted-foreground">Calculating impact…</p>
+            ) : (
+              <ul className="space-y-1.5 font-body text-sm text-foreground">
+                <li>
+                  <span className="font-semibold">{deleteImpact.projects}</span>{" "}
+                  {deleteImpact.projects === 1 ? "project" : "projects"} (and every prompt and discovery chat in them)
+                </li>
+                <li>
+                  <span className="font-semibold">{deleteImpact.prompts}</span> generated{" "}
+                  {deleteImpact.prompts === 1 ? "prompt" : "prompts"}
+                </li>
+                <li>
+                  <span className="font-semibold">{deleteImpact.credits}</span>{" "}
+                  unused {deleteImpact.credits === 1 ? "credit" : "credits"} (no refund)
+                </li>
+                {deleteImpact.plan !== "free" && (
+                  <li>
+                    Active{" "}
+                    <span className="font-semibold capitalize">
+                      {deleteImpact.plan === "5-pack" ? "5-Pack" : deleteImpact.plan}
+                    </span>{" "}
+                    subscription will be cancelled
+                  </li>
+                )}
+                <li>Access to any projects shared with you, and any teams you've joined</li>
+              </ul>
+            )}
+            <p className="mt-3 font-body text-xs text-muted-foreground">
+              Collaborators on your shared projects will lose access immediately. Stripe payment
+              records are retained per legal requirements.
+            </p>
+          </div>
+
           <div className="mt-4 space-y-4">
             <div>
               <label className="font-body text-xs text-muted-foreground">
@@ -268,7 +398,7 @@ const Settings = () => {
                 {deleting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Confirm Delete"
+                  "Permanently delete"
                 )}
               </Button>
             </div>
@@ -489,8 +619,32 @@ const Settings = () => {
           ) : (
             <>
               <p className="font-body text-sm text-muted-foreground">
-                Use API keys to access your projects and prompts programmatically.
+                Use API keys to fetch your projects and generated prompts from your own scripts
+                or integrations. Send the key in the{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">X-API-Key</code>{" "}
+                header.
               </p>
+
+              {/* Endpoint reference */}
+              <details className="rounded-card border border-border bg-[hsl(var(--surface-elevated))] p-4">
+                <summary className="cursor-pointer font-body text-xs font-medium text-foreground">
+                  Available endpoints
+                </summary>
+                <ul className="mt-3 space-y-1.5 font-mono text-[11px] text-muted-foreground">
+                  <li><span className="text-secondary">GET</span> /public-api/projects — list your projects</li>
+                  <li><span className="text-secondary">GET</span> /public-api/projects/:id — single project + metadata</li>
+                  <li><span className="text-secondary">GET</span> /public-api/projects/:id/prompts — full prompt list</li>
+                </ul>
+                <p className="mt-3 font-body text-[11px] text-muted-foreground">
+                  Rate limit: 60 requests/min. Errors: <code className="font-mono">401</code> (invalid/revoked key),{" "}
+                  <code className="font-mono">404</code> (project not yours),{" "}
+                  <code className="font-mono">429</code> (rate-limited). Email{" "}
+                  <a href="mailto:support@lovplan.com" className="text-primary hover:underline">
+                    support@lovplan.com
+                  </a>{" "}
+                  for higher limits.
+                </p>
+              </details>
 
               {/* New key value (shown once) */}
               {newKeyValue && (
@@ -595,6 +749,51 @@ const Settings = () => {
               </div>
             </>
           )}
+        </section>
+
+        {/* Divider */}
+        <div className="h-px bg-primary/20" />
+
+        {/* Section: Notifications */}
+        <section className="space-y-5">
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-primary" />
+            <h2 className="font-heading text-[22px] text-foreground">Notifications</h2>
+          </div>
+          <p className="font-body text-sm text-muted-foreground">
+            Transactional emails (sign-in, billing, deploy completion) are always sent.
+            You can opt out of everything else below.
+          </p>
+
+          <div className="space-y-3">
+            <label className="flex items-start gap-4 rounded-lg border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3 cursor-pointer">
+              <Switch
+                checked={notifPrefs.marketing}
+                disabled={!notifPrefs.loaded}
+                onCheckedChange={(v) => handleToggleNotif("marketing_email_optin", v)}
+              />
+              <div className="flex-1">
+                <p className="font-body text-sm font-medium text-foreground">Marketing emails</p>
+                <p className="mt-0.5 font-body text-xs text-muted-foreground">
+                  Newsletters, promotions, and occasional special offers.
+                </p>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-4 rounded-lg border border-border bg-[hsl(var(--surface-elevated))] px-4 py-3 cursor-pointer">
+              <Switch
+                checked={notifPrefs.productUpdates}
+                disabled={!notifPrefs.loaded}
+                onCheckedChange={(v) => handleToggleNotif("product_update_optin", v)}
+              />
+              <div className="flex-1">
+                <p className="font-body text-sm font-medium text-foreground">Product updates</p>
+                <p className="mt-0.5 font-body text-xs text-muted-foreground">
+                  Major new features, changelog highlights. Roughly once a month.
+                </p>
+              </div>
+            </label>
+          </div>
         </section>
 
         {/* Divider */}

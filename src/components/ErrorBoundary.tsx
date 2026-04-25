@@ -35,7 +35,11 @@ class ErrorBoundary extends Component<Props, State> {
               Something went wrong
             </h1>
             <p className="mt-2 font-body text-sm text-muted-foreground">
-              Please refresh the page. If this persists, contact support.
+              Please refresh the page. If this persists, email{" "}
+              <a href="mailto:support@lovplan.com" className="text-primary hover:underline">
+                support@lovplan.com
+              </a>
+              .
             </p>
             <Button
               variant="amber"

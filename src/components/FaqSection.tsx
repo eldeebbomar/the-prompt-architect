@@ -35,6 +35,18 @@ const faqs = [
     q: "What tech stack do the generated prompts use?",
     a: "By default: React, Vite, Tailwind CSS, shadcn/ui, Supabase (for auth, database, storage), and Stripe (for payments if needed). The AI architect asks about your preferences and adjusts.",
   },
+  {
+    q: "Is my project private?",
+    a: "Yes. Every project is private by default — only you and the collaborators you invite can see it. Public sharing is opt-in via the Share toggle inside the prompt viewer; even shared projects are read-only and can be made private again any time.",
+  },
+  {
+    q: "How do you handle my data?",
+    a: "We collect the minimum needed to run the service (account, project content, billing). We never sell or share your data with advertisers. Discovery chat content is sent to our AI workflows; everything else stays in our Supabase database. Full details in the Privacy Policy linked in the footer.",
+  },
+  {
+    q: "Are you GDPR compliant?",
+    a: "We minimise the data we collect, support self-service deletion in Settings → Danger Zone, and store data in Supabase, Stripe, and Resend per their compliance certifications. EU users are charged VAT at checkout. Email support@lovplan.com for a Data Processing Addendum.",
+  },
 ];
 
 const FaqSection = () => {

@@ -6,20 +6,16 @@ import lovplanWordmark from "@/assets/lovplan-wordmark.png";
 const footerLinks = {
   Product: [
     { label: "How It Works", href: "/#how-it-works" },
-    { label: "Pricing", href: "/#pricing" },
-    { label: "Examples", href: "/#examples" },
-    { label: "Changelog", href: "#" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "Examples", href: "/examples" },
   ],
   Resources: [
-    { label: "Documentation", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Prompt Writing Guide", href: "#" },
-    { label: "Lovable Tips", href: "#" },
+    { label: "Help Center", href: "/help" },
+    { label: "Contact", href: "mailto:support@lovplan.com" },
   ],
   Legal: [
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
-    { label: "Contact", href: "#" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
   ],
 };
 
@@ -85,16 +81,19 @@ const CtaFooter = () => {
                   {title}
                 </h4>
                 <ul className="space-y-2.5">
-                  {links.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        to={link.href}
-                        className="font-body text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
+                  {links.map((link) => {
+                    const isExternal = link.href.startsWith("mailto:") || link.href.startsWith("http");
+                    const cls = "font-body text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground";
+                    return (
+                      <li key={link.label}>
+                        {isExternal ? (
+                          <a href={link.href} className={cls}>{link.label}</a>
+                        ) : (
+                          <Link to={link.href} className={cls}>{link.label}</Link>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ))}

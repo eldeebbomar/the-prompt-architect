@@ -44,9 +44,17 @@ class RouteErrorBoundary extends Component<Props, State> {
               {isChunkError ? "Couldn't load this page" : "Something went wrong"}
             </h2>
             <p className="mt-2 font-body text-sm text-muted-foreground">
-              {isChunkError
-                ? "We deployed a new version. A quick refresh should fix it."
-                : "Please refresh and try again. If this keeps happening, contact support."}
+              {isChunkError ? (
+                "We deployed a new version. A quick refresh should fix it."
+              ) : (
+                <>
+                  Please refresh and try again. If this keeps happening, email{" "}
+                  <a href="mailto:support@lovplan.com" className="text-primary hover:underline">
+                    support@lovplan.com
+                  </a>
+                  .
+                </>
+              )}
             </p>
             <Button
               variant="amber"
