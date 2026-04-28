@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 10;
+const SELECTOR_VERSION = 11;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -361,82 +361,77 @@ async function insertTextVerified(element, text) {
   return false;
 }
 
-// Wait for confirmation that Lovable accepted the submission. Success
-// signals, in priority order:
-//   1. Input field cleared — Lovable ack'd cleanly.
-//   2. We clicked Skip on the Q&A panel and the panel is now gone — that's
-//      a positive ack; Lovable is processing, follow-up prompts will queue.
-//      We don't wait for prompt 1 to finish before firing prompt 2.
-//   3. New chat message appeared AND no Q&A panel still blocks.
-//   4. Lovable enters a "generating" state — wait that out, then re-check.
+// Wait for confirmation that Lovable accepted the submission, then move on.
 //
-// Continuously detects + dismisses Q&A. Multi-question panels need
-// multiple Skip clicks; we throttle to once per 1.5s.
+// The user's stated mental model: "paste the second prompt or wait to skip
+// the questions." So:
+//   - If a Q&A panel appears, skip it (loop until drained), then proceed.
+//   - If no Q&A appears within ~5 seconds of the send, proceed regardless
+//     of input state or generating state. Lovable's chat input placeholder
+//     is literally "Queue follow-up..." — it's designed for queuing.
+//
+// We don't wait for Lovable to finish processing prompt 1 before firing
+// prompt 2. That would make the deploy take an hour. insertText
+// select-all-replaces, so any leftover text in the input gets overwritten
+// cleanly by the next prompt.
 async function waitForInputCleared(element, timeoutMs, baselineMessageCount) {
+  const startTime = Date.now();
   const deadline = Date.now() + (timeoutMs || POST_SEND_CLEAR_TIMEOUT_MS);
-  let extendedDeadline = deadline;
   let lastSkipAt = 0;
   let didSkipAtLeastOnce = false;
   let pollCount = 0;
-  while (Date.now() < extendedDeadline) {
+
+  while (Date.now() < deadline) {
     if (cancelRequested) return false;
 
-    const current = readCurrentValue(element).trim();
+    // Re-find the input each poll in case Lovable replaced/re-rendered
+    // the element after our send.
+    const freshInput = getChatInput() || element;
+    const current = readCurrentValue(freshInput).trim();
+
+    // Cleanest signal: input went empty.
     if (current.length === 0) {
       dlog("Input cleared — submission confirmed");
       return true;
     }
 
     // Try dismissing any visible Q&A panel. Throttled so we don't spam
-    // clicks if a panel transitions slowly between questions.
+    // clicks while panels animate between questions.
     if (Date.now() - lastSkipAt > 1500) {
       if (detectAndSkipLovableQuestions()) {
         lastSkipAt = Date.now();
         didSkipAtLeastOnce = true;
         await delay(700);
-        continue; // re-poll immediately — input may have cleared after skip
+        continue;
       }
     }
 
-    // Strong signal: we successfully dismissed at least one Q&A and now
-    // there's no Q&A panel left. Treat as success — Lovable will queue
-    // any follow-up prompt we send next, and insertText replaces leftover
-    // text in the input field, so it doesn't matter if Lovable hasn't
-    // cleared the input yet. This prevents getting stuck waiting on a
-    // long generation we don't need to wait for.
+    // Skip-and-proceed: dismissed at least one Q&A, now panel is gone.
     if (didSkipAtLeastOnce && !isQAPanelVisible()) {
-      dlog("Q&A dismissed via Skip — proceeding to next prompt (Lovable will queue it)");
-      await delay(600); // let the page settle so the next type doesn't race
+      dlog("Q&A dismissed — proceeding to next prompt");
+      await delay(600);
       return true;
     }
 
-    // Alt success: a new chat message appeared AND no Q&A panel is still
-    // blocking. The Q&A guard prevents firing the next prompt while
-    // Lovable is waiting on user input.
-    if (typeof baselineMessageCount === "number" && baselineMessageCount >= 0) {
-      const now = getChatMessageCount();
-      if (now > baselineMessageCount && !isQAPanelVisible()) {
-        dlog("Detected new chat message + no Q&A — submission confirmed");
-        return true;
-      }
-    }
-
-    // While Lovable is visibly generating, push the deadline out. We don't
-    // want to fail just because the model is streaming a long answer.
-    if (isLovableGenerating() && extendedDeadline < Date.now() + GENERATING_EXTENSION_MS) {
-      extendedDeadline = Date.now() + GENERATING_EXTENSION_MS;
-      dlog("Lovable is generating — extending wait deadline");
+    // FORCE-PROCEED: after 5 seconds, if no Q&A is blocking, just go.
+    // Lovable will queue our next prompt while it finishes the current
+    // one. This is the path for "Lovable went straight to building, no
+    // questions" — we shouldn't wait minutes for the generation to finish.
+    const elapsedMs = Date.now() - startTime;
+    if (elapsedMs > 5000 && !isQAPanelVisible()) {
+      dlog(`Force-proceed: ${Math.round(elapsedMs / 1000)}s elapsed, no Q&A blocking — Lovable will queue the next prompt`);
+      await delay(400);
+      return true;
     }
 
     // Periodic state log (every ~3s) so the page console shows what's
-    // being checked while we wait. Helps diagnose stuck deploys.
+    // being checked while we wait.
     if (pollCount > 0 && pollCount % 15 === 0) {
       dlog("waiting:", {
-        secsLeft: Math.round((extendedDeadline - Date.now()) / 1000),
+        secsElapsed: Math.round(elapsedMs / 1000),
         currentLen: current.length,
         qaVisible: isQAPanelVisible(),
         generating: isLovableGenerating(),
-        msgCount: typeof baselineMessageCount === "number" ? getChatMessageCount() - baselineMessageCount : null,
         didSkip: didSkipAtLeastOnce,
       });
     }
