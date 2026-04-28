@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 6;
+const SELECTOR_VERSION = 7;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -513,33 +513,96 @@ function detectAndSkipLovableQuestions() {
   return false;
 }
 
-// Verify the picked input's placeholder looks like a Lovable chat input
-// before we type into it. If we accidentally picked an "Other" answer
-// textarea or some other random input, this catches it before we leak
-// prompt text into the wrong place. Returns the placeholder string we
-// matched, or null if it doesn't look right.
+// Verify the picked element looks like a Lovable chat input. Multi-tier so
+// we don't reject legitimate inputs just because they render their
+// placeholder via a sibling overlay rather than the placeholder= attribute.
+//
+// Tiers (any one passes):
+//   STRONG — element's own placeholder/aria-label contains a Lovable token
+//   STRONG — an ancestor's visible text contains a unique Lovable phrase
+//            (e.g., "ask lovable", "queue follow-up", "tell lovable")
+//   WEAK   — element is large + visible + bottom-half of viewport, on a
+//            lovable.dev page, and not inside a Q&A panel
+//
+// Returns a description string on pass, null on reject.
 const LOVABLE_PLACEHOLDER_TOKENS = [
   "queue follow-up",
   "queue follow up",
   "ask lovable",
   "tell lovable",
-  "build a",            // home page: "Ask Lovable to build a landing page for"
+  "ask lovable to build",
+  "ask lovable to create",
+  "build a",
+  "create a",
   "follow-up",
   "what to do",
+  "what should we build",
 ];
+
+// Strong text phrases that uniquely identify Lovable's chat surroundings.
+// Kept narrow so they don't false-positive on unrelated pages.
+const LOVABLE_STRONG_PHRASES = [
+  "ask lovable",
+  "tell lovable",
+  "queue follow-up",
+  "queue follow up",
+  "what should we build",
+];
+
+function isInQAPanel(el) {
+  if (!(el instanceof HTMLElement)) return false;
+  return !!el.closest(
+    '[role="dialog"], [role="radiogroup"], [aria-label*="question" i], [class*="question" i]',
+  );
+}
+
+function isLovableHost() {
+  const h = window.location.hostname || "";
+  return h === "lovable.dev" || h.endsWith(".lovable.dev");
+}
 
 function verifyLovableChatInput(el) {
   if (!(el instanceof HTMLElement)) return null;
-  const placeholder = (
+
+  // 1. Element's own attributes — placeholder / aria-placeholder /
+  // data-placeholder / aria-label.
+  const own = (
     el.getAttribute("placeholder") ||
     el.getAttribute("aria-placeholder") ||
     el.getAttribute("data-placeholder") ||
+    el.getAttribute("aria-label") ||
     ""
   ).toLowerCase();
-  if (!placeholder) return null;
-  for (const token of LOVABLE_PLACEHOLDER_TOKENS) {
-    if (placeholder.includes(token)) return placeholder;
+  if (own) {
+    for (const token of LOVABLE_PLACEHOLDER_TOKENS) {
+      if (own.includes(token)) return `attr match: '${own.slice(0, 60)}'`;
+    }
   }
+
+  // 2. Ancestor text — Lovable often renders the placeholder as a sibling
+  // overlay span/div instead of an attribute. Look up to 4 ancestors for
+  // unique Lovable phrases.
+  let ancestor = el.parentElement;
+  for (let depth = 0; depth < 4 && ancestor; depth++) {
+    const txt = (ancestor.textContent || "").toLowerCase();
+    for (const phrase of LOVABLE_STRONG_PHRASES) {
+      if (txt.includes(phrase)) return `ancestor text match (depth ${depth}): '${phrase}'`;
+    }
+    ancestor = ancestor.parentElement;
+  }
+
+  // 3. Weak fallback: on a lovable.dev page, accept any large visible input
+  // in the lower half of the viewport that isn't inside a Q&A panel. The
+  // chat input is almost always the biggest text-entry on a Lovable page;
+  // the only common false positives (Q&A "Other" field, search box) are
+  // either inside a panel we exclude or are too small.
+  if (isLovableHost() && !isInQAPanel(el)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 300 && r.height > 30 && r.top > (window.innerHeight || 0) * 0.4) {
+      return `weak: large input on lovable.dev (${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.top)}px from top)`;
+    }
+  }
+
   return null;
 }
 
@@ -629,27 +692,28 @@ async function sendOnePrompt(index, total, promptText) {
       bottomRel: `${Math.round((r.top / (window.innerHeight || 1)) * 100)}% from top`,
     });
 
-    // SAFETY CHECK: if the placeholder doesn't look like a Lovable chat
-    // input ("Queue follow-up...", "Ask Lovable...", "Tell Lovable...",
-    // etc.), refuse to type. Better to fail loudly than leak the prompt
-    // text into a search box, the "Other" answer field, or a voice
-    // transcript area.
+    // SAFETY CHECK: ensure the picked element passes verification (placeholder
+    // / ancestor-text / weak-fallback). If it doesn't, we'd rather fail
+    // loudly than leak prompt text into a search box, the "Other" answer
+    // field, or a voice transcript area.
     const matchedPh = verifyLovableChatInput(input);
     if (!matchedPh) {
       derr(
-        "REFUSING to type prompt " + index + " — picked element doesn't look like a Lovable chat input. Placeholder:",
-        placeholder,
+        "REFUSING to type prompt " + index + " — picked element didn't pass verification.",
+        { placeholder, ariaLabel: input.getAttribute("aria-label"), url: window.location.href },
       );
       dumpInputCandidates();
       chrome.runtime.sendMessage({
         action: "deployError",
         error:
-          "Prompt " + index + ": couldn't find Lovable's chat input on this page. " +
-          "Make sure you're on a Lovable project page (lovable.dev/projects/...) with the chat visible at the bottom, then resume.",
+          "Prompt " + index + ": couldn't verify the chat input on this page. " +
+          "URL: " + window.location.href + ". " +
+          "Picked element placeholder: '" + (placeholder || "(none)") + "'. " +
+          "Open lovable.dev/projects/<your-project> and resume, or share the page console log for diagnostics.",
       });
       return false;
     }
-    dlog("[" + index + "/" + total + "] Input verified as Lovable chat (placeholder: '" + matchedPh + "')");
+    dlog("[" + index + "/" + total + "] Input verified — " + matchedPh);
   }
 
   const inserted = await insertTextVerified(input, promptText);
