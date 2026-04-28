@@ -49,9 +49,9 @@ Deno.serve(async (req) => {
     const throttled = await enforceRateLimit(admin, userId, "generate-prompts", 5, 3600, corsHeaders);
     if (throttled) return throttled;
 
-    const body = await req.json().catch(() => ({}));
-    const project_id = typeof body?.project_id === "string" ? body.project_id : "";
-    const type = typeof body?.type === "string" ? body.type : undefined;
+    const requestBody = await req.json().catch(() => ({}));
+    const project_id = typeof requestBody?.project_id === "string" ? requestBody.project_id : "";
+    const type = typeof requestBody?.type === "string" ? requestBody.type : undefined;
 
     if (!project_id) {
       return new Response(
@@ -107,17 +107,17 @@ Deno.serve(async (req) => {
     // user-actionable problems as the right status code so the frontend
     // can show the credits modal / proper toast instead of silently
     // marking the project as "generating".
-    const body = result.body as Record<string, unknown> | unknown[];
-    if (body && !Array.isArray(body)) {
-      const errMsg = typeof body.error === "string" ? body.error : "";
-      const code = typeof body.code === "string" ? body.code : "";
+    const responseBody = result.body as Record<string, unknown> | unknown[];
+    if (responseBody && !Array.isArray(responseBody)) {
+      const errMsg = typeof responseBody.error === "string" ? responseBody.error : "";
+      const code = typeof responseBody.code === "string" ? responseBody.code : "";
       const blob = `${errMsg} ${code}`.toLowerCase();
 
       if (
         blob.includes("insufficient_credits") ||
         blob.includes("insufficient credits") ||
         blob.includes("no credits") ||
-        body.error === "INSUFFICIENT_CREDITS"
+        responseBody.error === "INSUFFICIENT_CREDITS"
       ) {
         console.warn("[generate-prompts] n8n reported insufficient credits");
         return new Response(
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
       }
 
       if (errMsg || code) {
-        console.error("[generate-prompts] n8n returned error body:", body);
+        console.error("[generate-prompts] n8n returned error body:", responseBody);
         return new Response(
           JSON.stringify({ error: errMsg || "Prompt generation failed", code: code || "n8n_error" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
