@@ -9,11 +9,17 @@ const SELECTOR_VERSION = 3;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
-// Max time to wait for Lovable to clear the input after a send. If exceeded,
-// either the send didn't go through or Lovable's UI hung — surface as an error
-// rather than concatenate text into the next iteration.
-const POST_SEND_CLEAR_TIMEOUT_MS = 8000;
-const POST_SEND_POLL_INTERVAL_MS = 100;
+// Max time to wait for Lovable to clear the input after a send. Lovable
+// typically clears within a few seconds, but on long generations or when
+// the network is slow it can take 20-30s before the input flips back to
+// empty. 30s gives realistic headroom; while Lovable is visibly generating
+// we extend further (see GENERATING_EXTENSION_MS).
+const POST_SEND_CLEAR_TIMEOUT_MS = 30000;
+const POST_SEND_POLL_INTERVAL_MS = 200;
+// While Lovable shows a "Stop generating" button or similar busy indicator,
+// extend the wait by this much. We treat the generating state as "Lovable
+// has the prompt and is working on it" so we should wait, not error.
+const GENERATING_EXTENSION_MS = 60000;
 // Courtesy gap between sends so we don't hammer Lovable. Tuned small because
 // the cleared-input wait already gates on actual submission.
 const INTER_SEND_COURTESY_MS = 800;
@@ -203,30 +209,50 @@ async function insertTextVerified(element, text) {
   return false;
 }
 
-// Wait until Lovable has cleared the input (its signal that the prior submission
-// was accepted). This replaces the prior fixed-delay heuristic that caused
-// repeat-prompt text to concatenate when Lovable was fast OR sends to drop
-// when Lovable was slow.
+// Wait for confirmation that Lovable accepted the submission. Three success
+// signals, in priority order:
+//   1. Input field cleared (the cleanest signal).
+//   2. New chat message appeared since send (works even when input is
+//      stuck disabled-with-text after Lovable starts streaming).
+//   3. Lovable enters a "generating" state (Stop button visible) — wait
+//      that out, then re-check 1 and 2.
 //
-// Mid-wait, also detect Lovable's clarifying-questions panel and click Skip —
-// otherwise Lovable blocks until the user answers and our wait times out.
-async function waitForInputCleared(element, timeoutMs) {
+// Also auto-skips Lovable's clarifying-questions panel if it appears.
+async function waitForInputCleared(element, timeoutMs, baselineMessageCount) {
   const deadline = Date.now() + (timeoutMs || POST_SEND_CLEAR_TIMEOUT_MS);
+  let extendedDeadline = deadline;
   let skippedQuestions = false;
   let pollCount = 0;
-  while (Date.now() < deadline) {
+  while (Date.now() < extendedDeadline) {
     if (cancelRequested) return false;
+
     const current = readCurrentValue(element).trim();
     if (current.length === 0) return true;
 
-    // Every few polls (every ~500ms), check whether Lovable has shown a
-    // questions panel and skip it. We only do this once per send — if Skip
-    // didn't unblock things, hammering the button isn't going to help.
+    // Alt success signal: a new chat message appeared since send. This
+    // catches the case where Lovable kept our text in a disabled input
+    // but actually accepted the prompt and is now responding.
+    if (typeof baselineMessageCount === "number" && baselineMessageCount >= 0) {
+      const now = getChatMessageCount();
+      if (now > baselineMessageCount) {
+        dlog("Detected new chat message — submission confirmed via chat history");
+        return true;
+      }
+    }
+
+    // While Lovable is visibly generating, push the deadline out. We don't
+    // want to fail just because the model is taking a while to stream a
+    // long answer.
+    if (isLovableGenerating() && extendedDeadline < Date.now() + GENERATING_EXTENSION_MS) {
+      extendedDeadline = Date.now() + GENERATING_EXTENSION_MS;
+      dlog("Lovable is generating — extending wait deadline");
+    }
+
+    // Every ~1s, check whether Lovable has shown a questions panel and
+    // skip it. Single-shot so we don't hammer the button.
     if (!skippedQuestions && pollCount % 5 === 4) {
       if (detectAndSkipLovableQuestions()) {
         skippedQuestions = true;
-        // Give Lovable a moment to react to the Skip click before resuming
-        // the input-cleared poll.
         await delay(400);
       }
     }
@@ -256,6 +282,51 @@ function detectLovableError() {
     return text.length > 240 ? text.slice(0, 240) + "…" : text;
   }
   return null;
+}
+
+// Count chat messages in the page. Used as an alternate success signal:
+// if the input never cleared but a new user-message bubble appeared after
+// our send, the prompt clearly went through. Selectors are intentionally
+// broad — Lovable's exact markup varies — and we use the max of any
+// matching strategy. Returns -1 if we can't reliably count anything.
+function getChatMessageCount() {
+  const strategies = [
+    () => document.querySelectorAll('[role="article"]').length,
+    () => document.querySelectorAll('[data-message-role], [data-role="user"], [data-role="assistant"]').length,
+    () => document.querySelectorAll('[class*="message"][class*="user" i], [class*="message"][class*="assistant" i]').length,
+    () => document.querySelectorAll('[class*="chat-message"], [class*="ChatMessage"]').length,
+  ];
+  let best = -1;
+  for (const fn of strategies) {
+    try {
+      const n = fn();
+      if (n > best) best = n;
+    } catch { /* ignore broken selectors */ }
+  }
+  return best;
+}
+
+// Detect whether Lovable is visibly generating. Looks for a Stop / Cancel
+// button, or a streaming/loading indicator. While true, we extend the
+// input-clear wait — Lovable has the prompt and is working on it.
+function isLovableGenerating() {
+  const buttons = Array.from(document.querySelectorAll("button"));
+  const hasStop = buttons.some((b) => {
+    if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
+    const txt = (b.textContent || "").trim().toLowerCase();
+    return txt === "stop" || txt === "stop generating" || txt.includes("stop generating");
+  });
+  if (hasStop) return true;
+  // Loading/streaming class hints — Lovable's spinners often live on
+  // elements with these class fragments. Be conservative: require a
+  // visible element so a hidden CSS class doesn't false-positive.
+  const loaders = document.querySelectorAll(
+    '[class*="streaming" i], [class*="generating" i], [class*="loading-message" i], [aria-busy="true"]',
+  );
+  for (const el of loaders) {
+    if (el instanceof HTMLElement && el.offsetParent) return true;
+  }
+  return false;
 }
 
 // Detect Lovable's clarifying-questions panel and click Skip.
@@ -537,6 +608,9 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
     });
 
     try {
+      // Snapshot the chat-message count BEFORE sending so waitForInputCleared
+      // can use "new message appeared" as a fallback success signal.
+      const baselineMessageCount = getChatMessageCount();
       const ok = await sendOnePrompt(i + 1, total, prompt.prompt_text);
       if (!ok) return;
 
@@ -547,13 +621,31 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
       // fixed delay caused text concatenation on fast Lovable responses.
       const inputAfter = getChatInput();
       if (inputAfter) {
-        const cleared = await waitForInputCleared(inputAfter);
+        let cleared = await waitForInputCleared(inputAfter, undefined, baselineMessageCount);
         if (cancelRequested) return;
+
+        // One-shot retry: if the input still has our text after the full
+        // wait, it may mean Lovable swallowed the click. Re-click send and
+        // do a shorter second wait. Anything stuck after that is a real
+        // problem worth surfacing.
+        if (!cleared && readCurrentValue(inputAfter).trim().length > 0) {
+          dwarn(`prompt ${i + 1} did not clear — retrying send once`);
+          const retryBtn = getSendButton();
+          if (retryBtn) {
+            retryBtn.click();
+          } else {
+            inputAfter.dispatchEvent(
+              new KeyboardEvent("keydown", {
+                key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true,
+              }),
+            );
+          }
+          cleared = await waitForInputCleared(inputAfter, 15000, baselineMessageCount);
+          if (cancelRequested) return;
+        }
+
         if (!cleared) {
           const lovableError = detectLovableError();
-          // If a Questions panel is still visible, we couldn't auto-skip it —
-          // ask the user to handle it manually. Otherwise default to the
-          // generic "input never cleared" message.
           const questionsStillUp = !!Array.from(document.querySelectorAll("button"))
             .find((b) => {
               if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
@@ -564,8 +656,8 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
             ? `Lovable error after prompt ${i + 1}: ${lovableError}`
             : questionsStillUp
               ? `Prompt ${i + 1}: Lovable is asking clarifying questions and the auto-skip didn't dismiss them. Click Skip on the Questions panel manually, then resume the deploy.`
-              : `Prompt ${i + 1} did not submit (input never cleared after 8s). Lovable may be slow or your tab is in a state we don't recognise — try refreshing the Lovable tab and resuming.`;
-          derr("input did not clear after send", { promptIndex: i + 1, lovableError, questionsStillUp });
+              : `Prompt ${i + 1} did not submit after retry. Lovable seems unresponsive — try refreshing the Lovable tab and resuming the deploy from the project page.`;
+          derr("input did not clear after send + retry", { promptIndex: i + 1, lovableError, questionsStillUp });
           chrome.runtime.sendMessage({
             action: "deployError",
             error: errorMsg,
