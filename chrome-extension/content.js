@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 4;
+const SELECTOR_VERSION = 5;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -172,27 +172,41 @@ function getChatInput() {
     if (el) return el;
   }
 
-  // 4. Last-resort fallback. Pick the LARGEST visible textarea/contenteditable
-  // — the chat input is almost always the biggest text entry on the page,
-  // unlike the small "Other" answer fields or search boxes.
+  // 4. Last-resort fallback. Among visible text-entry elements, pick the
+  // one most likely to be the chat input by:
+  //   * vertical position (chat inputs sit near the bottom of the viewport)
+  //   * size (real chat inputs are wider than small "Other" answer fields)
+  //   * NOT being inside a dialog, radiogroup, or panel labeled
+  //     "Question(s)" — those are clarifying-Q&A widgets, not chat
+  //   * NOT looking like a voice/transcript preview (dotted border, small)
+  const viewportHeight = window.innerHeight || 800;
   const generic = Array.from(
     document.querySelectorAll('textarea, [contenteditable="true"], [role="textbox"]'),
   ).filter((el) => {
     if (!(el instanceof HTMLElement)) return false;
     const r = el.getBoundingClientRect();
-    return r.width > 100 && r.height > 20 && el.offsetParent;
+    if (!(r.width > 200 && r.height > 24 && el.offsetParent)) return false;
+    // Exclude anything inside a Q&A / dialog / radiogroup container.
+    const blockers = el.closest(
+      '[role="dialog"], [role="radiogroup"], [aria-label*="question" i], [class*="question" i]',
+    );
+    if (blockers) return false;
+    return true;
   });
   if (generic.length > 0) {
-    // Sort by visible area, biggest first.
+    // Score: prefer larger area + lower position. Bottom of viewport is
+    // worth a lot — the chat input is almost always anchored to the bottom.
     generic.sort((a, b) => {
       const ar = a.getBoundingClientRect();
       const br = b.getBoundingClientRect();
-      return br.width * br.height - ar.width * ar.height;
+      const scoreA = ar.width * ar.height + (ar.top / viewportHeight) * 50000;
+      const scoreB = br.width * br.height + (br.top / viewportHeight) * 50000;
+      return scoreB - scoreA;
     });
     console.warn(
       "[LovPlan Deployer] fallback selector used for chat input (v" +
         SELECTOR_VERSION +
-        "). Lovable DOM may have changed. Picked largest visible input.",
+        "). Picked best-scored visible input outside any Q&A panel.",
     );
     dumpInputCandidates();
     return generic[0];
@@ -202,50 +216,53 @@ function getChatInput() {
   return null;
 }
 
+// EXPLICIT-ONLY send-button finder.
+//
+// Earlier versions tried to be clever — "the only enabled icon-only button
+// near the input is probably Send." That heuristic backfired badly: while
+// Lovable is streaming a response the Send button morphs into a Stop
+// button (same shape, same position, same icon-only signature). The
+// retry-send path picked Stop, cancelled the generation, and then the
+// next icon-only candidate happened to be the mic button which put the
+// chat in voice mode.
+//
+// Lesson: never click an icon-only button just because it's there. Only
+// click buttons we can identify by name/testid. If we can't, press Enter
+// and let the chat handle it.
 function getSendButton() {
+  // Only explicit, named selectors. No ancestor-walk, no icon heuristic.
+  const candidates = [
+    '[data-testid="send-button"]',
+    '[data-testid="submit-button"]',
+    '[data-testid*="send" i][data-testid*="button" i]',
+    'button[aria-label="Send"]',
+    'button[aria-label="Send message"]',
+    'button[aria-label*="send" i]:not([aria-label*="microphone" i]):not([aria-label*="voice" i]):not([aria-label*="attach" i]):not([aria-label*="file" i]):not([aria-label*="stop" i])',
+  ];
+  for (const sel of candidates) {
+    const el = document.querySelector(sel);
+    if (el instanceof HTMLElement && !(el).disabled && el.offsetParent) {
+      return el;
+    }
+  }
+
+  // Form-submit fallback — only if the form looks like a chat form (single
+  // text input + a single submit button), not a search/login/random form.
   const input = getChatInput();
-  if (!input) return null;
-
-  // 1. Explicit test-ids / aria labels (broadened to substring matches).
-  const explicit =
-    document.querySelector('[data-testid="send-button"]') ||
-    document.querySelector('[data-testid="submit-button"]') ||
-    document.querySelector('[data-testid*="send" i]:not([disabled])') ||
-    document.querySelector('button[aria-label*="send" i]:not([disabled])') ||
-    document.querySelector('button[aria-label*="submit" i]:not([disabled])');
-  if (explicit && !(explicit).disabled) return explicit;
-
-  // 2. Submit button inside the form wrapping the input.
-  const form = input.closest("form");
-  if (form) {
-    const submit = form.querySelector('button[type="submit"]:not([disabled])');
-    if (submit) return submit;
+  if (input) {
+    const form = input.closest("form");
+    if (form) {
+      const submit = form.querySelector('button[type="submit"]:not([disabled])');
+      const inputCount = form.querySelectorAll("textarea, input[type=text], [contenteditable=true]").length;
+      if (submit instanceof HTMLElement && submit.offsetParent && inputCount === 1) {
+        return submit;
+      }
+    }
   }
 
-  // 3. Closest enabled button to the input that's a direct sibling area.
-  // Lovable's chat input often has a send button as the next-element-sibling
-  // or inside a wrapper a level or two up. Walk the input's ancestors
-  // looking for an enabled button with a send-like icon (svg) in a
-  // small container near the input.
-  let ancestor = input.parentElement;
-  for (let depth = 0; depth < 4 && ancestor; depth++) {
-    const btns = Array.from(ancestor.querySelectorAll("button:not([disabled])"))
-      .filter((b) => b instanceof HTMLElement && b.offsetParent);
-    if (btns.length === 1) return btns[0];
-    // Prefer an icon-only button (likely the send icon).
-    const iconOnly = btns.find((b) => {
-      const txt = (b.textContent || "").trim();
-      return txt.length === 0 && b.querySelector("svg");
-    });
-    if (iconOnly) return iconOnly;
-    ancestor = ancestor.parentElement;
-  }
-
-  console.warn(
-    "[LovPlan Deployer] send button not found (v" +
-      SELECTOR_VERSION +
-      "). Will fall back to pressing Enter.",
-  );
+  // Nothing safely identifiable. The caller falls back to pressing Enter,
+  // which is how a human would normally submit anyway.
+  dwarn("send button not found (v" + SELECTOR_VERSION + ") — will press Enter on the chat input instead");
   dumpSendButtonCandidates();
   return null;
 }
@@ -552,7 +569,20 @@ async function sendOnePrompt(index, total, promptText) {
     return false;
   }
 
-  dlog("[" + index + "/" + total + "] Setting text…");
+  // Log which element we picked so users can verify it's the actual chat
+  // input — if it's the wrong one (e.g., a search box, a "Other" answer
+  // field, or a voice transcript), we'll see that here before any damage.
+  if (input instanceof HTMLElement) {
+    const r = input.getBoundingClientRect();
+    dlog("[" + index + "/" + total + "] Setting text on input:", {
+      tag: input.tagName.toLowerCase(),
+      placeholder: input.getAttribute("placeholder") || input.getAttribute("aria-placeholder") || null,
+      ariaLabel: input.getAttribute("aria-label") || null,
+      testid: input.getAttribute("data-testid") || null,
+      size: `${Math.round(r.width)}x${Math.round(r.height)}`,
+      bottomRel: `${Math.round((r.top / (window.innerHeight || 1)) * 100)}% from top`,
+    });
+  }
 
   const inserted = await insertTextVerified(input, promptText);
   if (!inserted) {
@@ -743,22 +773,25 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
         if (cancelRequested) return;
 
         // One-shot retry: if the input still has our text after the full
-        // wait, it may mean Lovable swallowed the click. Re-click send and
-        // do a shorter second wait. Anything stuck after that is a real
-        // problem worth surfacing.
+        // wait AND Lovable is NOT currently generating (clicking a Stop
+        // button looks identical to clicking Send to a heuristic, and we
+        // already know the icon-only-button heuristic is unsafe), re-press
+        // Enter. Never click a button on retry — Enter is the only safe
+        // action because it can't accidentally Stop or open Voice mode.
         if (!cleared && readCurrentValue(inputAfter).trim().length > 0) {
-          dwarn(`prompt ${i + 1} did not clear — retrying send once`);
-          const retryBtn = getSendButton();
-          if (retryBtn) {
-            retryBtn.click();
+          if (isLovableGenerating()) {
+            dwarn(`prompt ${i + 1}: input still has text but Lovable is generating — waiting it out, no retry`);
+            cleared = await waitForInputCleared(inputAfter, 60000, baselineMessageCount);
           } else {
+            dwarn(`prompt ${i + 1} did not clear — pressing Enter once as retry (no button click)`);
+            inputAfter.focus();
             inputAfter.dispatchEvent(
               new KeyboardEvent("keydown", {
                 key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true,
               }),
             );
+            cleared = await waitForInputCleared(inputAfter, 15000, baselineMessageCount);
           }
-          cleared = await waitForInputCleared(inputAfter, 15000, baselineMessageCount);
           if (cancelRequested) return;
         }
 
