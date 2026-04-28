@@ -207,12 +207,31 @@ async function insertTextVerified(element, text) {
 // was accepted). This replaces the prior fixed-delay heuristic that caused
 // repeat-prompt text to concatenate when Lovable was fast OR sends to drop
 // when Lovable was slow.
+//
+// Mid-wait, also detect Lovable's clarifying-questions panel and click Skip —
+// otherwise Lovable blocks until the user answers and our wait times out.
 async function waitForInputCleared(element, timeoutMs) {
   const deadline = Date.now() + (timeoutMs || POST_SEND_CLEAR_TIMEOUT_MS);
+  let skippedQuestions = false;
+  let pollCount = 0;
   while (Date.now() < deadline) {
     if (cancelRequested) return false;
     const current = readCurrentValue(element).trim();
     if (current.length === 0) return true;
+
+    // Every few polls (every ~500ms), check whether Lovable has shown a
+    // questions panel and skip it. We only do this once per send — if Skip
+    // didn't unblock things, hammering the button isn't going to help.
+    if (!skippedQuestions && pollCount % 5 === 4) {
+      if (detectAndSkipLovableQuestions()) {
+        skippedQuestions = true;
+        // Give Lovable a moment to react to the Skip click before resuming
+        // the input-cleared poll.
+        await delay(400);
+      }
+    }
+
+    pollCount++;
     await delay(POST_SEND_POLL_INTERVAL_MS);
   }
   return false;
@@ -237,6 +256,44 @@ function detectLovableError() {
     return text.length > 240 ? text.slice(0, 240) + "…" : text;
   }
   return null;
+}
+
+// Detect Lovable's clarifying-questions panel and click Skip.
+// Pattern observed: a panel containing the word "Questions" + one or more
+// radio choices + a "Skip" button + a "Submit" button. When auto-deploying
+// LovPlan prompts (which are designed to be self-contained), skipping is
+// the right call — otherwise Lovable blocks on user input forever and the
+// "input never cleared" timeout fires.
+function detectAndSkipLovableQuestions() {
+  const buttons = Array.from(document.querySelectorAll("button"));
+  // Find a visible "Skip" button next to a "Submit" button — that's the
+  // signature of Lovable's questions panel. Plain "Skip" buttons elsewhere
+  // (e.g., onboarding tooltips) are unlikely to also have a Submit sibling.
+  const skipBtn = buttons.find((b) => {
+    if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
+    const txt = (b.textContent || "").trim().toLowerCase();
+    if (txt !== "skip") return false;
+    // Look for a Submit button within the same nearest panel/section.
+    const panel = b.closest('[role="dialog"], [role="region"], section, form, div');
+    if (!panel) return false;
+    const hasSubmit = Array.from(panel.querySelectorAll("button")).some((sib) => {
+      const sibTxt = (sib.textContent || "").trim().toLowerCase();
+      return sibTxt === "submit" && sib instanceof HTMLElement && sib.offsetParent;
+    });
+    return hasSubmit;
+  });
+
+  if (skipBtn) {
+    dlog("Detected Lovable questions panel — clicking Skip to continue auto-deploy");
+    try {
+      skipBtn.click();
+      return true;
+    } catch (err) {
+      derr("Failed to click Skip:", err);
+      return false;
+    }
+  }
+  return false;
 }
 
 function waitForInput(timeoutMs) {
@@ -494,13 +551,24 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
         if (cancelRequested) return;
         if (!cleared) {
           const lovableError = detectLovableError();
-          derr("input did not clear after send", { promptIndex: i + 1, lovableError });
+          // If a Questions panel is still visible, we couldn't auto-skip it —
+          // ask the user to handle it manually. Otherwise default to the
+          // generic "input never cleared" message.
+          const questionsStillUp = !!Array.from(document.querySelectorAll("button"))
+            .find((b) => {
+              if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
+              const txt = (b.textContent || "").trim().toLowerCase();
+              return txt === "skip" || txt === "submit";
+            });
+          const errorMsg = lovableError
+            ? `Lovable error after prompt ${i + 1}: ${lovableError}`
+            : questionsStillUp
+              ? `Prompt ${i + 1}: Lovable is asking clarifying questions and the auto-skip didn't dismiss them. Click Skip on the Questions panel manually, then resume the deploy.`
+              : `Prompt ${i + 1} did not submit (input never cleared after 8s). Lovable may be slow or your tab is in a state we don't recognise — try refreshing the Lovable tab and resuming.`;
+          derr("input did not clear after send", { promptIndex: i + 1, lovableError, questionsStillUp });
           chrome.runtime.sendMessage({
             action: "deployError",
-            error:
-              lovableError
-                ? `Lovable error after prompt ${i + 1}: ${lovableError}`
-                : `Prompt ${i + 1} did not submit (input never cleared). Lovable may be slow or rate-limiting.`,
+            error: errorMsg,
             lastCompletedIndex: Math.max(0, i - 1),
           });
           return;
