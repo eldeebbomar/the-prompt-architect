@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 7;
+const SELECTOR_VERSION = 8;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -364,52 +364,51 @@ async function insertTextVerified(element, text) {
 // Wait for confirmation that Lovable accepted the submission. Three success
 // signals, in priority order:
 //   1. Input field cleared (the cleanest signal).
-//   2. New chat message appeared since send (works even when input is
-//      stuck disabled-with-text after Lovable starts streaming).
-//   3. Lovable enters a "generating" state (Stop button visible) — wait
-//      that out, then re-check 1 and 2.
+//   2. New chat message appeared AND no Q&A panel is blocking. The chat
+//      message signal alone is too eager — Lovable's reply renders as soon
+//      as it acknowledges, but a Q&A panel can still gate the next prompt.
+//   3. Lovable enters a "generating" state — wait that out.
 //
-// Also auto-skips Lovable's clarifying-questions panel if it appears.
+// Also continuously detects + dismisses Lovable's Q&A panel. Multi-question
+// panels need multiple Skip clicks; we throttle to once per 1.5s.
 async function waitForInputCleared(element, timeoutMs, baselineMessageCount) {
   const deadline = Date.now() + (timeoutMs || POST_SEND_CLEAR_TIMEOUT_MS);
   let extendedDeadline = deadline;
-  let skippedQuestions = false;
-  let pollCount = 0;
+  let lastSkipAt = 0;
   while (Date.now() < extendedDeadline) {
     if (cancelRequested) return false;
 
     const current = readCurrentValue(element).trim();
     if (current.length === 0) return true;
 
-    // Alt success signal: a new chat message appeared since send. This
-    // catches the case where Lovable kept our text in a disabled input
-    // but actually accepted the prompt and is now responding.
+    // Try dismissing any visible Q&A panel. Throttled so we don't spam
+    // clicks if a panel transitions slowly between questions.
+    if (Date.now() - lastSkipAt > 1500) {
+      if (detectAndSkipLovableQuestions()) {
+        lastSkipAt = Date.now();
+        await delay(500);
+        continue; // re-poll immediately — input may have cleared after skip
+      }
+    }
+
+    // Alt success: a new chat message appeared AND no Q&A panel is still
+    // blocking. The Q&A guard prevents firing the next prompt while
+    // Lovable is waiting on user input.
     if (typeof baselineMessageCount === "number" && baselineMessageCount >= 0) {
       const now = getChatMessageCount();
-      if (now > baselineMessageCount) {
-        dlog("Detected new chat message — submission confirmed via chat history");
+      if (now > baselineMessageCount && !isQAPanelVisible()) {
+        dlog("Detected new chat message + no Q&A — submission confirmed");
         return true;
       }
     }
 
     // While Lovable is visibly generating, push the deadline out. We don't
-    // want to fail just because the model is taking a while to stream a
-    // long answer.
+    // want to fail just because the model is streaming a long answer.
     if (isLovableGenerating() && extendedDeadline < Date.now() + GENERATING_EXTENSION_MS) {
       extendedDeadline = Date.now() + GENERATING_EXTENSION_MS;
       dlog("Lovable is generating — extending wait deadline");
     }
 
-    // Every ~1s, check whether Lovable has shown a questions panel and
-    // skip it. Single-shot so we don't hammer the button.
-    if (!skippedQuestions && pollCount % 5 === 4) {
-      if (detectAndSkipLovableQuestions()) {
-        skippedQuestions = true;
-        await delay(400);
-      }
-    }
-
-    pollCount++;
     await delay(POST_SEND_POLL_INTERVAL_MS);
   }
   return false;
@@ -481,36 +480,73 @@ function isLovableGenerating() {
   return false;
 }
 
-// Detect Lovable's clarifying-questions panel and click "Skip all".
+// Detect Lovable's clarifying-questions panel and dismiss it.
 //
-// Lovable's actual button text (verified from the live UI 2026-04-28) is:
-//   - "Skip all"   — dismisses the entire questions panel without answering
-//   - "Next"       — submits the current selected answer
-//   - navigation arrows < and > — browse questions
-// (NOT "Skip" + "Submit" as earlier code assumed.)
+// Lovable has at least TWO Q&A panel variants observed in the live UI:
+//   Variant A: "Skip all" + "Next"     (skips the entire panel at once)
+//   Variant B: "Skip" + "Submit"        (skips the current question only)
 //
-// "Skip all" is unambiguous — there's no other plausible button on a Lovable
-// page with that exact text. So we match it directly and click it. No
-// adjacent-button signature needed.
+// For variant A: clicking "Skip all" dismisses everything — single shot.
+// For variant B: "Skip" advances one question; with N questions we need N
+// clicks. The caller (waitForInputCleared) calls us repeatedly so multi-
+// question chains get fully drained.
+//
+// "Skip all" is unambiguous on a Lovable page. Plain "Skip" is paired with
+// the sibling "Submit" or "Next" requirement so we don't accidentally
+// click random Skip buttons elsewhere (onboarding tooltips, etc.).
 function detectAndSkipLovableQuestions() {
   const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+  const visible = (b) => b instanceof HTMLElement && b.offsetParent;
+
+  // Variant A: "Skip all" alone — dismisses the panel completely.
   const skipAll = buttons.find((b) => {
-    if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
+    if (!visible(b)) return false;
     const txt = (b.textContent || "").trim().toLowerCase();
     return txt === "skip all" || txt === "skipall";
   });
-
   if (skipAll) {
-    dlog("Detected Lovable questions panel — clicking 'Skip all' to continue auto-deploy");
-    try {
-      skipAll.click();
-      return true;
-    } catch (err) {
-      derr("Failed to click 'Skip all':", err);
-      return false;
-    }
+    dlog("Q&A panel detected — clicking 'Skip all'");
+    try { skipAll.click(); return true; }
+    catch (err) { derr("'Skip all' click failed:", err); }
   }
+
+  // Variant B: a "Skip" button paired with a "Submit" or "Next" sibling
+  // inside the same panel. The pairing prevents false positives on
+  // onboarding/tooltip Skip buttons.
+  const skip = buttons.find((b) => {
+    if (!visible(b)) return false;
+    const txt = (b.textContent || "").trim().toLowerCase();
+    if (txt !== "skip") return false;
+    const panel = b.closest('[role="dialog"], [role="region"], section, form, div');
+    if (!panel) return false;
+    const hasPair = Array.from(panel.querySelectorAll("button")).some((sib) => {
+      if (!visible(sib)) return false;
+      const sibTxt = (sib.textContent || "").trim().toLowerCase();
+      return sibTxt === "submit" || sibTxt === "next";
+    });
+    return hasPair;
+  });
+  if (skip) {
+    dlog("Q&A panel detected — clicking 'Skip' (paired with Submit/Next)");
+    try { skip.click(); return true; }
+    catch (err) { derr("'Skip' click failed:", err); }
+  }
+
   return false;
+}
+
+// Is a Q&A panel currently visible? Used to suppress the "new chat message
+// = success" alt signal — Lovable's reply message shows up as soon as it
+// acknowledges the prompt, but if a Q&A panel is still blocking, the next
+// prompt would type into a stuck input. We only call success when the
+// panel is gone.
+function isQAPanelVisible() {
+  const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+  return buttons.some((b) => {
+    if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
+    const txt = (b.textContent || "").trim().toLowerCase();
+    return txt === "skip" || txt === "skip all";
+  });
 }
 
 // Verify the picked element looks like a Lovable chat input. Multi-tier so
@@ -929,16 +965,11 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
 
         if (!cleared) {
           const lovableError = detectLovableError();
-          const questionsStillUp = !!Array.from(document.querySelectorAll("button"))
-            .find((b) => {
-              if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
-              const txt = (b.textContent || "").trim().toLowerCase();
-              return txt === "skip" || txt === "submit";
-            });
+          const questionsStillUp = isQAPanelVisible();
           const errorMsg = lovableError
             ? `Lovable error after prompt ${i + 1}: ${lovableError}`
             : questionsStillUp
-              ? `Prompt ${i + 1}: Lovable is asking clarifying questions and the auto-skip didn't dismiss them. Click Skip on the Questions panel manually, then resume the deploy.`
+              ? `Prompt ${i + 1}: Lovable's questions panel didn't dismiss automatically. Click Skip / Skip all on the panel manually, then resume the deploy.`
               : `Prompt ${i + 1} did not submit after retry. Lovable seems unresponsive — try refreshing the Lovable tab and resuming the deploy from the project page.`;
           derr("input did not clear after send + retry", { promptIndex: i + 1, lovableError, questionsStillUp });
           chrome.runtime.sendMessage({
