@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 5;
+const SELECTOR_VERSION = 6;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -153,23 +153,40 @@ function getChatInput() {
     document.querySelector('[contenteditable="true"][aria-label*="prompt" i]');
   if (byAria) return byAria;
 
-  // 3. Placeholder-based — Lovable's chat input typically has a placeholder
-  // like "Ask Lovable…" / "Tell Lovable what to do…" / "Message Lovable…".
-  // Match across textarea, contenteditable[aria-placeholder], and role=textbox.
+  // 3. Placeholder-based — Lovable's chat input placeholder varies:
+  //   "Ask Lovable to build a landing page for" — home page (new project)
+  //   "Queue follow-up..."                       — project page (post-send)
+  //   "Tell Lovable what to do instead..."       — project page during Q&A
+  // Cover all three across textarea, contenteditable, and role=textbox
+  // (with placeholder, aria-placeholder, and data-placeholder variants).
   const placeholderSelectors = [
+    // Most specific first
+    'textarea[placeholder*="queue follow" i]',
+    'textarea[placeholder*="ask lovable" i]',
+    'textarea[placeholder*="tell lovable" i]',
+    '[contenteditable="true"][aria-placeholder*="queue follow" i]',
+    '[contenteditable="true"][aria-placeholder*="ask lovable" i]',
+    '[contenteditable="true"][aria-placeholder*="tell lovable" i]',
+    '[contenteditable="true"][data-placeholder*="queue follow" i]',
+    '[contenteditable="true"][data-placeholder*="ask lovable" i]',
+    '[contenteditable="true"][data-placeholder*="tell lovable" i]',
+    // Looser fallbacks
     'textarea[placeholder*="lovable" i]',
+    'textarea[placeholder*="follow-up" i]',
+    'textarea[placeholder*="queue" i]',
     'textarea[placeholder*="ask" i]',
     'textarea[placeholder*="tell" i]',
-    'textarea[placeholder*="message" i]',
-    'textarea[placeholder*="prompt" i]',
     '[contenteditable="true"][aria-placeholder*="lovable" i]',
-    '[contenteditable="true"][aria-placeholder*="ask" i]',
-    '[contenteditable="true"][aria-placeholder*="tell" i]',
+    '[contenteditable="true"][aria-placeholder*="follow" i]',
+    '[contenteditable="true"][aria-placeholder*="queue" i]',
+    '[contenteditable="true"][data-placeholder*="lovable" i]',
+    '[contenteditable="true"][data-placeholder*="follow" i]',
     '[role="textbox"][aria-placeholder*="lovable" i]',
+    '[role="textbox"][aria-placeholder*="follow" i]',
   ];
   for (const sel of placeholderSelectors) {
     const el = document.querySelector(sel);
-    if (el) return el;
+    if (el instanceof HTMLElement && el.offsetParent) return el;
   }
 
   // 4. Last-resort fallback. Among visible text-entry elements, pick the
@@ -464,42 +481,66 @@ function isLovableGenerating() {
   return false;
 }
 
-// Detect Lovable's clarifying-questions panel and click Skip.
-// Pattern observed: a panel containing the word "Questions" + one or more
-// radio choices + a "Skip" button + a "Submit" button. When auto-deploying
-// LovPlan prompts (which are designed to be self-contained), skipping is
-// the right call — otherwise Lovable blocks on user input forever and the
-// "input never cleared" timeout fires.
+// Detect Lovable's clarifying-questions panel and click "Skip all".
+//
+// Lovable's actual button text (verified from the live UI 2026-04-28) is:
+//   - "Skip all"   — dismisses the entire questions panel without answering
+//   - "Next"       — submits the current selected answer
+//   - navigation arrows < and > — browse questions
+// (NOT "Skip" + "Submit" as earlier code assumed.)
+//
+// "Skip all" is unambiguous — there's no other plausible button on a Lovable
+// page with that exact text. So we match it directly and click it. No
+// adjacent-button signature needed.
 function detectAndSkipLovableQuestions() {
-  const buttons = Array.from(document.querySelectorAll("button"));
-  // Find a visible "Skip" button next to a "Submit" button — that's the
-  // signature of Lovable's questions panel. Plain "Skip" buttons elsewhere
-  // (e.g., onboarding tooltips) are unlikely to also have a Submit sibling.
-  const skipBtn = buttons.find((b) => {
+  const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+  const skipAll = buttons.find((b) => {
     if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
     const txt = (b.textContent || "").trim().toLowerCase();
-    if (txt !== "skip") return false;
-    // Look for a Submit button within the same nearest panel/section.
-    const panel = b.closest('[role="dialog"], [role="region"], section, form, div');
-    if (!panel) return false;
-    const hasSubmit = Array.from(panel.querySelectorAll("button")).some((sib) => {
-      const sibTxt = (sib.textContent || "").trim().toLowerCase();
-      return sibTxt === "submit" && sib instanceof HTMLElement && sib.offsetParent;
-    });
-    return hasSubmit;
+    return txt === "skip all" || txt === "skipall";
   });
 
-  if (skipBtn) {
-    dlog("Detected Lovable questions panel — clicking Skip to continue auto-deploy");
+  if (skipAll) {
+    dlog("Detected Lovable questions panel — clicking 'Skip all' to continue auto-deploy");
     try {
-      skipBtn.click();
+      skipAll.click();
       return true;
     } catch (err) {
-      derr("Failed to click Skip:", err);
+      derr("Failed to click 'Skip all':", err);
       return false;
     }
   }
   return false;
+}
+
+// Verify the picked input's placeholder looks like a Lovable chat input
+// before we type into it. If we accidentally picked an "Other" answer
+// textarea or some other random input, this catches it before we leak
+// prompt text into the wrong place. Returns the placeholder string we
+// matched, or null if it doesn't look right.
+const LOVABLE_PLACEHOLDER_TOKENS = [
+  "queue follow-up",
+  "queue follow up",
+  "ask lovable",
+  "tell lovable",
+  "build a",            // home page: "Ask Lovable to build a landing page for"
+  "follow-up",
+  "what to do",
+];
+
+function verifyLovableChatInput(el) {
+  if (!(el instanceof HTMLElement)) return null;
+  const placeholder = (
+    el.getAttribute("placeholder") ||
+    el.getAttribute("aria-placeholder") ||
+    el.getAttribute("data-placeholder") ||
+    ""
+  ).toLowerCase();
+  if (!placeholder) return null;
+  for (const token of LOVABLE_PLACEHOLDER_TOKENS) {
+    if (placeholder.includes(token)) return placeholder;
+  }
+  return null;
 }
 
 function waitForInput(timeoutMs) {
@@ -570,18 +611,45 @@ async function sendOnePrompt(index, total, promptText) {
   }
 
   // Log which element we picked so users can verify it's the actual chat
-  // input — if it's the wrong one (e.g., a search box, a "Other" answer
+  // input — if it's the wrong one (e.g., a search box, an "Other" answer
   // field, or a voice transcript), we'll see that here before any damage.
   if (input instanceof HTMLElement) {
     const r = input.getBoundingClientRect();
+    const placeholder =
+      input.getAttribute("placeholder") ||
+      input.getAttribute("aria-placeholder") ||
+      input.getAttribute("data-placeholder") ||
+      null;
     dlog("[" + index + "/" + total + "] Setting text on input:", {
       tag: input.tagName.toLowerCase(),
-      placeholder: input.getAttribute("placeholder") || input.getAttribute("aria-placeholder") || null,
+      placeholder,
       ariaLabel: input.getAttribute("aria-label") || null,
       testid: input.getAttribute("data-testid") || null,
       size: `${Math.round(r.width)}x${Math.round(r.height)}`,
       bottomRel: `${Math.round((r.top / (window.innerHeight || 1)) * 100)}% from top`,
     });
+
+    // SAFETY CHECK: if the placeholder doesn't look like a Lovable chat
+    // input ("Queue follow-up...", "Ask Lovable...", "Tell Lovable...",
+    // etc.), refuse to type. Better to fail loudly than leak the prompt
+    // text into a search box, the "Other" answer field, or a voice
+    // transcript area.
+    const matchedPh = verifyLovableChatInput(input);
+    if (!matchedPh) {
+      derr(
+        "REFUSING to type prompt " + index + " — picked element doesn't look like a Lovable chat input. Placeholder:",
+        placeholder,
+      );
+      dumpInputCandidates();
+      chrome.runtime.sendMessage({
+        action: "deployError",
+        error:
+          "Prompt " + index + ": couldn't find Lovable's chat input on this page. " +
+          "Make sure you're on a Lovable project page (lovable.dev/projects/...) with the chat visible at the bottom, then resume.",
+      });
+      return false;
+    }
+    dlog("[" + index + "/" + total + "] Input verified as Lovable chat (placeholder: '" + matchedPh + "')");
   }
 
   const inserted = await insertTextVerified(input, promptText);
