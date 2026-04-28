@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 3;
+const SELECTOR_VERSION = 4;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -70,12 +70,77 @@ window.addEventListener("beforeunload", () => {
 // trip, we log with SELECTOR_VERSION so we can tell from user reports when
 // Lovable has changed their DOM.
 
+// One-shot dump of every plausible chat-input candidate on the page, with
+// the attributes we'd use to identify it. Triggered from getChatInput's
+// fallback path so the lovable.dev page console shows us exactly what
+// Lovable's current DOM looks like — paste those into the chat with us
+// and we can write a precise selector instead of relying on the generic
+// fallback.
+let _diagDumped = false;
+function dumpInputCandidates() {
+  if (_diagDumped) return;
+  _diagDumped = true;
+  const candidates = Array.from(
+    document.querySelectorAll('textarea, [contenteditable="true"], [role="textbox"], input[type="text"]'),
+  );
+  console.group("[lovplan][content] DOM diagnostic — input candidates on " + window.location.href);
+  console.log("Total candidates:", candidates.length);
+  candidates.forEach((el, i) => {
+    if (!(el instanceof HTMLElement)) return;
+    const r = el.getBoundingClientRect();
+    console.log(`[${i}] <${el.tagName.toLowerCase()}>`, {
+      id: el.id || null,
+      classList: el.className?.toString?.() || null,
+      placeholder: el.getAttribute("placeholder") || (el).placeholder || null,
+      ariaLabel: el.getAttribute("aria-label") || null,
+      ariaPlaceholder: el.getAttribute("aria-placeholder") || null,
+      role: el.getAttribute("role") || null,
+      name: el.getAttribute("name") || null,
+      testid: el.getAttribute("data-testid") || null,
+      dataset: { ...el.dataset },
+      contentEditable: el.getAttribute("contenteditable") || null,
+      visibleSize: { w: Math.round(r.width), h: Math.round(r.height) },
+      visible: r.width > 0 && r.height > 0,
+      parentClass: el.parentElement?.className?.toString?.() || null,
+      grandparentClass: el.parentElement?.parentElement?.className?.toString?.() || null,
+      sample: (el.outerHTML || "").slice(0, 280),
+    });
+  });
+  console.groupEnd();
+}
+
+let _sendDiagDumped = false;
+function dumpSendButtonCandidates() {
+  if (_sendDiagDumped) return;
+  _sendDiagDumped = true;
+  const candidates = Array.from(document.querySelectorAll("button, [role='button']"));
+  const visible = candidates.filter((b) => b instanceof HTMLElement && b.offsetParent && !(b).disabled);
+  console.group("[lovplan][content] DOM diagnostic — visible buttons (" + visible.length + ")");
+  visible.slice(0, 30).forEach((el, i) => {
+    if (!(el instanceof HTMLElement)) return;
+    const r = el.getBoundingClientRect();
+    console.log(`[${i}]`, {
+      text: (el.textContent || "").trim().slice(0, 60),
+      ariaLabel: el.getAttribute("aria-label") || null,
+      testid: el.getAttribute("data-testid") || null,
+      type: el.getAttribute("type") || null,
+      id: el.id || null,
+      classList: el.className?.toString?.() || null,
+      visibleSize: { w: Math.round(r.width), h: Math.round(r.height) },
+      sample: (el.outerHTML || "").slice(0, 200),
+    });
+  });
+  console.groupEnd();
+}
+
 function getChatInput() {
   // 1. data-testid (most stable across refactors, Lovable uses these).
   const byTestId =
     document.querySelector('[data-testid="chat-input"]') ||
     document.querySelector('[data-testid="prompt-input"]') ||
-    document.querySelector('[data-testid="message-input"]');
+    document.querySelector('[data-testid="message-input"]') ||
+    document.querySelector('[data-testid*="chat" i][data-testid*="input" i]') ||
+    document.querySelector('[data-testid*="prompt" i][data-testid*="input" i]');
   if (byTestId) return byTestId;
 
   // 2. aria-label with chat/prompt/message semantics.
@@ -83,22 +148,57 @@ function getChatInput() {
     document.querySelector('textarea[aria-label*="chat" i]') ||
     document.querySelector('textarea[aria-label*="prompt" i]') ||
     document.querySelector('textarea[aria-label*="message" i]') ||
-    document.querySelector('[role="textbox"][aria-label*="chat" i]');
+    document.querySelector('[role="textbox"][aria-label*="chat" i]') ||
+    document.querySelector('[contenteditable="true"][aria-label*="chat" i]') ||
+    document.querySelector('[contenteditable="true"][aria-label*="prompt" i]');
   if (byAria) return byAria;
 
-  // 3. Generic fallbacks — log when tripped so we notice DOM changes.
-  const generic =
-    document.querySelector("textarea") ||
-    document.querySelector('[contenteditable="true"]') ||
-    document.querySelector('[role="textbox"]');
-  if (generic) {
+  // 3. Placeholder-based — Lovable's chat input typically has a placeholder
+  // like "Ask Lovable…" / "Tell Lovable what to do…" / "Message Lovable…".
+  // Match across textarea, contenteditable[aria-placeholder], and role=textbox.
+  const placeholderSelectors = [
+    'textarea[placeholder*="lovable" i]',
+    'textarea[placeholder*="ask" i]',
+    'textarea[placeholder*="tell" i]',
+    'textarea[placeholder*="message" i]',
+    'textarea[placeholder*="prompt" i]',
+    '[contenteditable="true"][aria-placeholder*="lovable" i]',
+    '[contenteditable="true"][aria-placeholder*="ask" i]',
+    '[contenteditable="true"][aria-placeholder*="tell" i]',
+    '[role="textbox"][aria-placeholder*="lovable" i]',
+  ];
+  for (const sel of placeholderSelectors) {
+    const el = document.querySelector(sel);
+    if (el) return el;
+  }
+
+  // 4. Last-resort fallback. Pick the LARGEST visible textarea/contenteditable
+  // — the chat input is almost always the biggest text entry on the page,
+  // unlike the small "Other" answer fields or search boxes.
+  const generic = Array.from(
+    document.querySelectorAll('textarea, [contenteditable="true"], [role="textbox"]'),
+  ).filter((el) => {
+    if (!(el instanceof HTMLElement)) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 100 && r.height > 20 && el.offsetParent;
+  });
+  if (generic.length > 0) {
+    // Sort by visible area, biggest first.
+    generic.sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      return br.width * br.height - ar.width * ar.height;
+    });
     console.warn(
       "[LovPlan Deployer] fallback selector used for chat input (v" +
         SELECTOR_VERSION +
-        "). Lovable DOM may have changed.",
+        "). Lovable DOM may have changed. Picked largest visible input.",
     );
-    return generic;
+    dumpInputCandidates();
+    return generic[0];
   }
+  console.error("[LovPlan Deployer] no chat input candidates found at all on", window.location.href);
+  dumpInputCandidates();
   return null;
 }
 
@@ -106,13 +206,14 @@ function getSendButton() {
   const input = getChatInput();
   if (!input) return null;
 
-  // 1. Explicit test-ids / aria labels.
+  // 1. Explicit test-ids / aria labels (broadened to substring matches).
   const explicit =
     document.querySelector('[data-testid="send-button"]') ||
     document.querySelector('[data-testid="submit-button"]') ||
+    document.querySelector('[data-testid*="send" i]:not([disabled])') ||
     document.querySelector('button[aria-label*="send" i]:not([disabled])') ||
     document.querySelector('button[aria-label*="submit" i]:not([disabled])');
-  if (explicit && !explicit.disabled) return explicit;
+  if (explicit && !(explicit).disabled) return explicit;
 
   // 2. Submit button inside the form wrapping the input.
   const form = input.closest("form");
@@ -121,14 +222,31 @@ function getSendButton() {
     if (submit) return submit;
   }
 
-  // No further guessing. The old "last enabled button in container" heuristic
-  // matched unrelated menu buttons and sent to wrong places — better to fail
-  // fast so the user knows to report a DOM change than silently click wrong.
+  // 3. Closest enabled button to the input that's a direct sibling area.
+  // Lovable's chat input often has a send button as the next-element-sibling
+  // or inside a wrapper a level or two up. Walk the input's ancestors
+  // looking for an enabled button with a send-like icon (svg) in a
+  // small container near the input.
+  let ancestor = input.parentElement;
+  for (let depth = 0; depth < 4 && ancestor; depth++) {
+    const btns = Array.from(ancestor.querySelectorAll("button:not([disabled])"))
+      .filter((b) => b instanceof HTMLElement && b.offsetParent);
+    if (btns.length === 1) return btns[0];
+    // Prefer an icon-only button (likely the send icon).
+    const iconOnly = btns.find((b) => {
+      const txt = (b.textContent || "").trim();
+      return txt.length === 0 && b.querySelector("svg");
+    });
+    if (iconOnly) return iconOnly;
+    ancestor = ancestor.parentElement;
+  }
+
   console.warn(
     "[LovPlan Deployer] send button not found (v" +
       SELECTOR_VERSION +
       "). Will fall back to pressing Enter.",
   );
+  dumpSendButtonCandidates();
   return null;
 }
 
