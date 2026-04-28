@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 12;
+const SELECTOR_VERSION = 13;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -44,7 +44,7 @@ function derr(...args) {
   console.error("[lovplan][content]", ...args);
 }
 
-console.log("[lovplan][content] v1.1.12 (selectorVersion=" + SELECTOR_VERSION + ") loaded on", window.location.href);
+console.log("[lovplan][content] v1.1.13 (selectorVersion=" + SELECTOR_VERSION + ") loaded on", window.location.href);
 
 let cancelRequested = false;
 let pauseRequested = false;
@@ -297,17 +297,29 @@ function getSelectorHealth() {
   };
 }
 
+// Reverted to the v1.0.0 typing approach (which the user reports worked
+// reliably). Earlier "improvements" added an explicit execCommand("delete")
+// + extra event dispatches; those changes may be triggering Lovable
+// editor handlers that open the "+" menu or interfere with the next send.
+// Keep it simple: select-all, insert. Lovable's editor handles the rest.
 function insertText(element, text) {
   element.focus();
 
-  const isFormControl = element.tagName === "TEXTAREA" || element.tagName === "INPUT";
-
-  if (isFormControl) {
-    // Native form control: select-all then insert. Modern frameworks
-    // (React) need the prototype value setter to fire change detection.
+  if (element.tagName === "TEXTAREA" || element.tagName === "INPUT") {
     element.select();
-    const ok = document.execCommand("insertText", false, text);
-    if (!ok) {
+  } else {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  const ok = document.execCommand("insertText", false, text);
+
+  if (!ok) {
+    console.warn("[LovPlan Deployer] execCommand failed, using setter fallback");
+    if (element.tagName === "TEXTAREA" || element.tagName === "INPUT") {
       const proto =
         element.tagName === "TEXTAREA"
           ? HTMLTextAreaElement.prototype
@@ -315,42 +327,11 @@ function insertText(element, text) {
       const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
       if (setter) setter.call(element, text);
       else element.value = text;
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      element.textContent = "";
+      element.textContent = text;
     }
-    return;
-  }
-
-  // Contenteditable: leftover text from a previous prompt is the main
-  // hazard here. We explicitly clear then insert, and dispatch the events
-  // most React-based chat UIs need to register the change.
-
-  // 1. Select everything inside the element and try to delete it via
-  // execCommand — this is what a Cmd+A + Delete does.
-  const range1 = document.createRange();
-  range1.selectNodeContents(element);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range1);
-  document.execCommand("delete", false);
-
-  // 2. Hard-clear textContent in case execCommand("delete") was a no-op
-  // for this contenteditable variant.
-  if (element.textContent && element.textContent.length > 0) {
-    element.textContent = "";
-  }
-
-  // 3. Insert the new text. execCommand("insertText") is widely supported
-  // by Lexical/Slate/ProseMirror-based chat editors and dispatches the
-  // beforeinput/input events those frameworks listen for.
-  const ok = document.execCommand("insertText", false, text);
-
-  // 4. Setter-based fallback if execCommand was rejected.
-  if (!ok && (!element.textContent || element.textContent.length === 0)) {
-    console.warn("[LovPlan Deployer] execCommand insertText failed on contenteditable, using textContent fallback");
-    element.textContent = text;
-    element.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
-    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
   }
 }
@@ -818,27 +799,34 @@ async function sendOnePrompt(index, total, promptText) {
     return false;
   }
 
-  // Always press Enter — never click a button. Earlier versions tried to
-  // find a "send" button to click, but Lovable's chat input area has
-  // microphone, stop, and "+" / attachment buttons that are easy to
-  // misidentify. Pressing Enter on the focused chat input is the
-  // unambiguous safe submission method, the same as a human typing.
-  dlog("[" + index + "/" + total + "] Pressing Enter to submit…");
+  // Always press Enter — never click a button. Reverted to keydown-only
+  // (the v1.0.0 approach). v1.1.12 added keypress + keyup which may be
+  // triggering Lovable hotkeys (some chat editors interpret keypress
+  // events as command-palette / slash-menu openers).
   input.focus();
-  // Some chat inputs only respond to a full keypress sequence
-  // (keydown + keypress + keyup) rather than just keydown.
-  for (const type of ["keydown", "keypress", "keyup"]) {
-    input.dispatchEvent(
-      new KeyboardEvent(type, {
-        key: "Enter",
-        code: "Enter",
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
+  // Verify focus actually moved to the input. If something else has
+  // focus when we dispatch Enter, the keystroke goes there instead — and
+  // that's how the "+" menu was opening on previous versions.
+  const activeBefore = document.activeElement;
+  if (activeBefore !== input) {
+    derr(`[${index}/${total}] focus did NOT move to chat input after focus(). activeElement is:`, {
+      tag: activeBefore?.tagName,
+      classes: activeBefore?.className?.toString?.(),
+      ariaLabel: activeBefore?.getAttribute?.("aria-label"),
+      testid: activeBefore?.getAttribute?.("data-testid"),
+    });
   }
+  dlog(`[${index}/${total}] Pressing Enter to submit (activeElement=${document.activeElement?.tagName})`);
+  input.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      keyCode: 13,
+      which: 13,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
 
   return true;
 }
