@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 9;
+const SELECTOR_VERSION = 10;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -490,20 +490,40 @@ function getChatMessageCount() {
   return best;
 }
 
-// Detect whether Lovable is visibly generating. Looks for a Stop / Cancel
-// button, or a streaming/loading indicator. While true, we extend the
-// input-clear wait — Lovable has the prompt and is working on it.
+// Detect whether Lovable is visibly generating / thinking. Multiple
+// signals because Lovable shows different states (Thinking, Generating,
+// Generating Image, etc.) with text labels OR icon-only Stop buttons OR
+// loading classes. While any of these are true, the wait deadline gets
+// extended so we don't fail on long generations.
 function isLovableGenerating() {
+  // 1. Visible "Thinking" / "Generating" status text (Lovable surfaces
+  // these as plain text elements next to the chat).
+  const STATUS_TOKENS = ["thinking", "generating", "streaming", "analyzing"];
+  const candidates = document.querySelectorAll('p, div, span, [role="status"]');
+  for (const el of candidates) {
+    if (!(el instanceof HTMLElement) || !el.offsetParent) continue;
+    const txt = (el.textContent || "").trim().toLowerCase();
+    if (txt.length > 60) continue; // avoid matching huge paragraphs
+    for (const tok of STATUS_TOKENS) {
+      if (txt === tok || txt === `${tok}…` || txt === `${tok}...` || txt.startsWith(`${tok} `)) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Stop / Cancel button — by visible text OR by aria-label (the
+  // Lovable Stop button is icon-only and uses aria-label="Stop generating"
+  // or similar).
   const buttons = Array.from(document.querySelectorAll("button"));
-  const hasStop = buttons.some((b) => {
-    if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
+  for (const b of buttons) {
+    if (!(b instanceof HTMLElement) || !b.offsetParent) continue;
     const txt = (b.textContent || "").trim().toLowerCase();
-    return txt === "stop" || txt === "stop generating" || txt.includes("stop generating");
-  });
-  if (hasStop) return true;
-  // Loading/streaming class hints — Lovable's spinners often live on
-  // elements with these class fragments. Be conservative: require a
-  // visible element so a hidden CSS class doesn't false-positive.
+    if (txt === "stop" || txt === "stop generating" || txt.includes("stop generating")) return true;
+    const aria = (b.getAttribute("aria-label") || "").toLowerCase();
+    if (aria === "stop" || aria.includes("stop generating") || aria.includes("stop generation")) return true;
+  }
+
+  // 3. Loading/streaming class hints + aria-busy.
   const loaders = document.querySelectorAll(
     '[class*="streaming" i], [class*="generating" i], [class*="loading-message" i], [aria-busy="true"]',
   );
@@ -513,73 +533,55 @@ function isLovableGenerating() {
   return false;
 }
 
-// Detect Lovable's clarifying-questions panel and dismiss it.
+// Find Lovable's clarifying-questions Skip button. Two variants in the
+// wild:
+//   Variant A: "Skip all" alone — single click dismisses entire panel.
+//   Variant B: "Skip" paired with sibling "Submit" or "Next" — single
+//              click skips one question; multi-question chains need N
+//              clicks (caller calls us repeatedly).
 //
-// Lovable has at least TWO Q&A panel variants observed in the live UI:
-//   Variant A: "Skip all" + "Next"     (skips the entire panel at once)
-//   Variant B: "Skip" + "Submit"        (skips the current question only)
-//
-// For variant A: clicking "Skip all" dismisses everything — single shot.
-// For variant B: "Skip" advances one question; with N questions we need N
-// clicks. The caller (waitForInputCleared) calls us repeatedly so multi-
-// question chains get fully drained.
-//
-// "Skip all" is unambiguous on a Lovable page. Plain "Skip" is paired with
-// the sibling "Submit" or "Next" requirement so we don't accidentally
-// click random Skip buttons elsewhere (onboarding tooltips, etc.).
-function detectAndSkipLovableQuestions() {
+// The pairing requirement on Variant B prevents matching unrelated Skip
+// buttons (onboarding tooltips, settings menu items, etc.) — they wouldn't
+// have a Submit/Next sibling. This is also what isQAPanelVisible() uses,
+// so the two functions agree on what counts as "a Q&A panel exists".
+function findLovableSkipButton() {
   const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
   const visible = (b) => b instanceof HTMLElement && b.offsetParent;
 
-  // Variant A: "Skip all" alone — dismisses the panel completely.
-  const skipAll = buttons.find((b) => {
-    if (!visible(b)) return false;
+  for (const b of buttons) {
+    if (!visible(b)) continue;
     const txt = (b.textContent || "").trim().toLowerCase();
-    return txt === "skip all" || txt === "skipall";
-  });
-  if (skipAll) {
-    dlog("Q&A panel detected — clicking 'Skip all'");
-    try { skipAll.click(); return true; }
-    catch (err) { derr("'Skip all' click failed:", err); }
-  }
 
-  // Variant B: a "Skip" button paired with a "Submit" or "Next" sibling
-  // inside the same panel. The pairing prevents false positives on
-  // onboarding/tooltip Skip buttons.
-  const skip = buttons.find((b) => {
-    if (!visible(b)) return false;
-    const txt = (b.textContent || "").trim().toLowerCase();
-    if (txt !== "skip") return false;
-    const panel = b.closest('[role="dialog"], [role="region"], section, form, div');
-    if (!panel) return false;
-    const hasPair = Array.from(panel.querySelectorAll("button")).some((sib) => {
-      if (!visible(sib)) return false;
-      const sibTxt = (sib.textContent || "").trim().toLowerCase();
-      return sibTxt === "submit" || sibTxt === "next";
-    });
-    return hasPair;
-  });
-  if (skip) {
-    dlog("Q&A panel detected — clicking 'Skip' (paired with Submit/Next)");
-    try { skip.click(); return true; }
-    catch (err) { derr("'Skip' click failed:", err); }
-  }
+    if (txt === "skip all" || txt === "skipall") return b;
 
-  return false;
+    if (txt === "skip") {
+      const panel = b.closest('[role="dialog"], [role="region"], section, form, div');
+      if (!panel) continue;
+      const hasPair = Array.from(panel.querySelectorAll("button")).some((sib) => {
+        if (!visible(sib)) return false;
+        const sibTxt = (sib.textContent || "").trim().toLowerCase();
+        return sibTxt === "submit" || sibTxt === "next";
+      });
+      if (hasPair) return b;
+    }
+  }
+  return null;
 }
 
-// Is a Q&A panel currently visible? Used to suppress the "new chat message
-// = success" alt signal — Lovable's reply message shows up as soon as it
-// acknowledges the prompt, but if a Q&A panel is still blocking, the next
-// prompt would type into a stuck input. We only call success when the
-// panel is gone.
+function detectAndSkipLovableQuestions() {
+  const btn = findLovableSkipButton();
+  if (!btn) return false;
+  const label = (btn.textContent || "").trim();
+  dlog(`Q&A panel detected — clicking '${label}'`);
+  try { btn.click(); return true; }
+  catch (err) { derr("Skip click failed:", err); return false; }
+}
+
+// Single source of truth for "is there a Q&A panel still blocking?".
+// Returns true ONLY when an actionable Q&A skip target exists. Random
+// Skip buttons elsewhere on the page don't count.
 function isQAPanelVisible() {
-  const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
-  return buttons.some((b) => {
-    if (!(b instanceof HTMLElement) || !b.offsetParent) return false;
-    const txt = (b.textContent || "").trim().toLowerCase();
-    return txt === "skip" || txt === "skip all";
-  });
+  return findLovableSkipButton() !== null;
 }
 
 // Verify the picked element looks like a Lovable chat input. Multi-tier so
@@ -991,12 +993,28 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
         if (!cleared) {
           const lovableError = detectLovableError();
           const questionsStillUp = isQAPanelVisible();
+          const inputLen = readCurrentValue(inputAfter).trim().length;
+          const generating = isLovableGenerating();
+
+          // Dump full state so the next failure is instantly diagnosable
+          // from one screenshot.
+          derr("WAIT TIMEOUT — state at failure:", {
+            promptIndex: i + 1,
+            inputLen,
+            qaVisible: questionsStillUp,
+            generating,
+            lovableError,
+            url: window.location.href,
+          });
+
           const errorMsg = lovableError
             ? `Lovable error after prompt ${i + 1}: ${lovableError}`
             : questionsStillUp
               ? `Prompt ${i + 1}: Lovable's questions panel didn't dismiss automatically. Click Skip / Skip all on the panel manually, then resume the deploy.`
-              : `Prompt ${i + 1} did not submit after retry. Lovable seems unresponsive — try refreshing the Lovable tab and resuming the deploy from the project page.`;
-          derr("input did not clear after send + retry", { promptIndex: i + 1, lovableError, questionsStillUp });
+              : generating
+                ? `Prompt ${i + 1}: Lovable is still generating after a long wait. Wait for the current generation to finish, then resume the deploy.`
+                : `Prompt ${i + 1} did not submit. Lovable seems stuck (input has ${inputLen} chars, no Q&A, not generating). Try refreshing the Lovable tab and resuming.`;
+
           chrome.runtime.sendMessage({
             action: "deployError",
             error: errorMsg,
