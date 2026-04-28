@@ -17,7 +17,7 @@ const corsHeaders = {
 
 const SITE_NAME = 'LovPlan'
 const ROOT_DOMAIN = 'lovplan.com'
-const FROM_ADDRESS = `LovPlan <noreply@notify.lovplan.com>`
+const FROM_ADDRESS = `LovPlan <noreply@mail.lovplan.com>`
 
 const EMAIL_SUBJECTS: Record<string, string> = {
   signup: 'Confirm your email to start building with LovPlan',
@@ -177,7 +177,7 @@ async function handleWebhook(req: Request): Promise<Response> {
   const sendResult = await sendViaResend(user.email, subject, html, text)
 
   if (!sendResult.ok) {
-    console.error('Resend send failed', { emailType, email: user.email, error: sendResult.error })
+    console.error('Resend send failed (non-fatal, signup will still complete)', { emailType, email: user.email, error: sendResult.error })
     await supabase.from('email_send_log').insert({
       message_id: messageId,
       template_name: emailType,
@@ -185,9 +185,10 @@ async function handleWebhook(req: Request): Promise<Response> {
       status: 'failed',
       error_message: sendResult.error?.slice(0, 500),
     })
-    // Return 500 so Supabase can retry.
-    return new Response(JSON.stringify({ error: sendResult.error }), {
-      status: 500,
+    // Return 200 so Supabase Auth still completes the signup. The account is created;
+    // we just lost the email — visible in email_send_log for manual recovery.
+    return new Response(JSON.stringify({ success: false, error: sendResult.error, delivered: false }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

@@ -1,59 +1,51 @@
-
 ## Goal
-Stop fallback Supabase emails and ensure all auth emails are LovPlan-branded, sent from your configured domain, with auth redirects consistently pointing to `https://lovplan.com`.
 
-## What I found (current state)
-- You are on the correct Supabase project (`gnovkpjawtodjcgizxsh`) — this is not a wrong-project issue.
-- Auth logs still show `mail_from: noreply@mail.app.supabase.io`, which confirms fallback/default auth email path is still active.
-- `auth-email-hook` code is branded correctly in repo, but there are no runtime logs from it, so it’s not active in the live auth pipeline.
-- Queue infrastructure required by that hook is incomplete in DB right now:
-  - Missing function: `enqueue_email`
-  - Missing tables: `email_send_state`, `suppressed_emails`, `email_unsubscribe_tokens`
-  - Only `email_send_log` exists
-- Frontend redirect code is already hardcoded to `https://lovplan.com` in login/signup; I’ll still run a full redirect audit.
+Get signups working again with branded LovPlan emails sent from `mail.lovplan.com` via Resend, and remove all the half-finished email scaffolding that's been causing confusion.
 
-## Implementation plan
-1. Re-activate managed email pipeline on the existing verified domain  
-   - Re-run managed email infrastructure setup for `notify.lovplan.com`/`lovplan.com` so the queue + dispatcher stack is fully provisioned in this project.
+## Why signup is currently broken
 
-2. Re-scaffold auth email hook through managed setup (overwrite existing)  
-   - Replace the manually drifted hook wiring with managed hook registration so Supabase Auth actually routes events to it.
+Every signup triggers Supabase's "Send Email Hook" → our `auth-email-hook` edge function. That function tries to send via Resend from `notify.lovplan.com`, which is unverified (its DNS is delegated to Lovable's nameservers and can't hold Resend's records). Resend rejects with 403, the hook returns 500, and Supabase Auth aborts the signup.
 
-3. Re-apply LovPlan branding after scaffold  
-   - Ensure all 6 auth templates use LovPlan styling/copy and sender identity:
-     - Brand name: `LovPlan`
-     - Visible sender: `LovPlan <noreply@lovplan.com>`
-     - Sending domain: `notify.lovplan.com`
-     - Links/site references: `https://lovplan.com`
+## The fix
 
-4. Deploy updated auth email hook  
-   - Publish the hook so the live auth flow uses branded templates instead of fallback defaults.
+### 1. Point the sender at the verified domain
+- Update `FROM_ADDRESS` in `supabase/functions/auth-email-hook/index.ts` from `noreply@notify.lovplan.com` → `noreply@mail.lovplan.com`.
+- Update `siteUrl` / link generation to keep using `https://lovplan.com` (unchanged — only the sender domain moves).
 
-5. Redirect hardening audit (all auth flows)  
-   - Confirm every auth redirect path stays on `https://lovplan.com`:
-     - Signup confirmation redirect
-     - Google OAuth redirect
-     - Any additional auth redirects in code and auth settings
+### 2. Make the hook fail-soft so a Resend hiccup never blocks signup again
+Currently the hook returns 500 on any Resend error, which tells Supabase to abort the signup. Change it so:
+- If signature verification fails → still return 401 (correct behavior).
+- If Resend fails to send → log the failure to `email_send_log` as `failed`, but return **200** so Supabase Auth completes the signup. The user account is created; we just lost an email (which we can see in logs and re-send manually if needed).
+- This is the standard pattern for non-critical send hooks.
 
-6. End-to-end verification in production  
-   - Trigger signup + password reset
-   - Confirm:
-     - Sender is LovPlan/domain-based (not `mail.app.supabase.io`)
-     - Email content is branded
-     - Links land on `lovplan.com`
-     - Hook logs and send-log entries appear for each auth event
+### 3. Deploy and test on the backend
+- Deploy `auth-email-hook`.
+- Curl the function with a synthetic Supabase webhook payload to confirm it returns 200 and Resend accepts the send.
+- Check `email_send_log` for a `sent` row.
+- Report the result back before you spend your last test trial.
 
-## Technical details
-- Files to verify/update:
-  - `supabase/functions/auth-email-hook/index.ts`
-  - `supabase/functions/_shared/email-templates/{signup,magic-link,recovery,invite,email-change,reauthentication}.tsx`
-  - `src/pages/Signup.tsx`
-  - `src/pages/Login.tsx`
-- DB/runtime artifacts expected after repair:
-  - Function: `enqueue_email`
-  - Tables: `email_send_state`, `suppressed_emails`, `email_unsubscribe_tokens` (+ existing `email_send_log`)
-  - Active queue dispatcher for email processing
-- Success criteria:
-  - New auth logs no longer show `noreply@mail.app.supabase.io`
-  - Branded auth emails are received with LovPlan identity
-  - Redirects consistently resolve to `https://lovplan.com`
+### 4. Clean up the scaffolding rubbish
+Delete what's no longer needed so the repo stops looking like a graveyard:
+- `supabase/templates-dashboard/` — leftover HTML templates from a previous setup attempt; not referenced anywhere.
+- `.lovable/plan.md` — stale plan from a previous session that references missing tables (`enqueue_email`, `email_send_state`, etc.) we never actually want.
+- Leave the 6 React Email templates in `supabase/functions/_shared/email-templates/` — those are what the hook actually uses.
+- Leave `email_send_log` table — useful for debugging.
+- Leave `SEND_EMAIL_HOOK_SECRET` — required for webhook signature verification.
+
+### 5. Things you need to do manually (one-time, in dashboards)
+- **Resend dashboard**: nothing — `mail.lovplan.com` is already verified.
+- **Supabase dashboard → Authentication → Hooks → Send Email Hook**: confirm the hook is enabled and pointed at the `auth-email-hook` URL with the `SEND_EMAIL_HOOK_SECRET` value. (It already is — just verifying.)
+- **Optional cleanup**: at your DNS provider you can later remove the `notify.lovplan.com` NS records pointing to `ns3/ns4.lovable.cloud` since we're no longer using that subdomain. Not urgent.
+
+## What "working normally" looks like after this
+
+- User signs up → Supabase creates the account → fires webhook → our hook renders the branded LovPlan template → Resend sends from `LovPlan <noreply@mail.lovplan.com>` → user gets the confirmation email → clicks link → lands on `https://lovplan.com/auth/callback` → logged in.
+- Same path for password reset, magic link, email change, reauthentication.
+- If Resend ever has an outage, signup still succeeds; we just see a `failed` row in `email_send_log` and can resend manually.
+
+## Files touched
+
+- `supabase/functions/auth-email-hook/index.ts` — change `FROM_ADDRESS`, make Resend errors non-fatal.
+- Delete: `supabase/templates-dashboard/`, `.lovable/plan.md`.
+
+No DB migrations needed. No new secrets needed (`RESEND_API_KEY` and `SEND_EMAIL_HOOK_SECRET` are already set).
