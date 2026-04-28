@@ -364,6 +364,35 @@ export type Database = {
         }
         Relationships: []
       }
+      project_idempotency: {
+        Row: {
+          created_at: string
+          idempotency_key: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_idempotency_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
@@ -430,6 +459,15 @@ export type Database = {
         Returns: Json
       }
       check_credits: { Args: { p_user_id: string }; Returns: number }
+      create_project_atomic: {
+        Args: {
+          p_description: string
+          p_idempotency_key: string
+          p_name: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       deduct_credit: {
         Args: { p_description: string; p_project_id: string; p_user_id: string }
         Returns: boolean
