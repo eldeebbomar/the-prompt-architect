@@ -81,9 +81,18 @@ serve(async (req: Request) => {
       .single();
 
     if (sessionError) {
+      // Surface the actual DB error so we can debug schema drift /
+      // missing-column / RLS issues from the client side instead of
+      // a generic 500. The link-code itself is already marked used at
+      // this point, so leaking the Postgres detail is low risk.
       console.error("Failed to create session:", sessionError);
       return new Response(
-        JSON.stringify({ error: "Failed to create session" }),
+        JSON.stringify({
+          error: "Failed to create session",
+          detail: sessionError.message,
+          code: sessionError.code,
+          hint: sessionError.hint,
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
