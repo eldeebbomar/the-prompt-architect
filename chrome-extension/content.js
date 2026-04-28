@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 8;
+const SELECTOR_VERSION = 9;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -361,34 +361,53 @@ async function insertTextVerified(element, text) {
   return false;
 }
 
-// Wait for confirmation that Lovable accepted the submission. Three success
+// Wait for confirmation that Lovable accepted the submission. Success
 // signals, in priority order:
-//   1. Input field cleared (the cleanest signal).
-//   2. New chat message appeared AND no Q&A panel is blocking. The chat
-//      message signal alone is too eager — Lovable's reply renders as soon
-//      as it acknowledges, but a Q&A panel can still gate the next prompt.
-//   3. Lovable enters a "generating" state — wait that out.
+//   1. Input field cleared — Lovable ack'd cleanly.
+//   2. We clicked Skip on the Q&A panel and the panel is now gone — that's
+//      a positive ack; Lovable is processing, follow-up prompts will queue.
+//      We don't wait for prompt 1 to finish before firing prompt 2.
+//   3. New chat message appeared AND no Q&A panel still blocks.
+//   4. Lovable enters a "generating" state — wait that out, then re-check.
 //
-// Also continuously detects + dismisses Lovable's Q&A panel. Multi-question
-// panels need multiple Skip clicks; we throttle to once per 1.5s.
+// Continuously detects + dismisses Q&A. Multi-question panels need
+// multiple Skip clicks; we throttle to once per 1.5s.
 async function waitForInputCleared(element, timeoutMs, baselineMessageCount) {
   const deadline = Date.now() + (timeoutMs || POST_SEND_CLEAR_TIMEOUT_MS);
   let extendedDeadline = deadline;
   let lastSkipAt = 0;
+  let didSkipAtLeastOnce = false;
+  let pollCount = 0;
   while (Date.now() < extendedDeadline) {
     if (cancelRequested) return false;
 
     const current = readCurrentValue(element).trim();
-    if (current.length === 0) return true;
+    if (current.length === 0) {
+      dlog("Input cleared — submission confirmed");
+      return true;
+    }
 
     // Try dismissing any visible Q&A panel. Throttled so we don't spam
     // clicks if a panel transitions slowly between questions.
     if (Date.now() - lastSkipAt > 1500) {
       if (detectAndSkipLovableQuestions()) {
         lastSkipAt = Date.now();
-        await delay(500);
+        didSkipAtLeastOnce = true;
+        await delay(700);
         continue; // re-poll immediately — input may have cleared after skip
       }
+    }
+
+    // Strong signal: we successfully dismissed at least one Q&A and now
+    // there's no Q&A panel left. Treat as success — Lovable will queue
+    // any follow-up prompt we send next, and insertText replaces leftover
+    // text in the input field, so it doesn't matter if Lovable hasn't
+    // cleared the input yet. This prevents getting stuck waiting on a
+    // long generation we don't need to wait for.
+    if (didSkipAtLeastOnce && !isQAPanelVisible()) {
+      dlog("Q&A dismissed via Skip — proceeding to next prompt (Lovable will queue it)");
+      await delay(600); // let the page settle so the next type doesn't race
+      return true;
     }
 
     // Alt success: a new chat message appeared AND no Q&A panel is still
@@ -408,6 +427,20 @@ async function waitForInputCleared(element, timeoutMs, baselineMessageCount) {
       extendedDeadline = Date.now() + GENERATING_EXTENSION_MS;
       dlog("Lovable is generating — extending wait deadline");
     }
+
+    // Periodic state log (every ~3s) so the page console shows what's
+    // being checked while we wait. Helps diagnose stuck deploys.
+    if (pollCount > 0 && pollCount % 15 === 0) {
+      dlog("waiting:", {
+        secsLeft: Math.round((extendedDeadline - Date.now()) / 1000),
+        currentLen: current.length,
+        qaVisible: isQAPanelVisible(),
+        generating: isLovableGenerating(),
+        msgCount: typeof baselineMessageCount === "number" ? getChatMessageCount() - baselineMessageCount : null,
+        didSkip: didSkipAtLeastOnce,
+      });
+    }
+    pollCount++;
 
     await delay(POST_SEND_POLL_INTERVAL_MS);
   }
@@ -940,25 +973,17 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
         let cleared = await waitForInputCleared(inputAfter, undefined, baselineMessageCount);
         if (cancelRequested) return;
 
-        // One-shot retry: if the input still has our text after the full
-        // wait AND Lovable is NOT currently generating (clicking a Stop
-        // button looks identical to clicking Send to a heuristic, and we
-        // already know the icon-only-button heuristic is unsafe), re-press
-        // Enter. Never click a button on retry — Enter is the only safe
-        // action because it can't accidentally Stop or open Voice mode.
+        // If we haven't cleared but Lovable is busy generating, just keep
+        // waiting — never re-fire Enter while Lovable is working.
+        // The retry-Enter path was opening Lovable's "+" attachment menu
+        // in some focus states (synthetic Enter going to the wrong target),
+        // so we no longer dispatch Enter as a recovery move. The Q&A
+        // skip-and-proceed path in waitForInputCleared handles the typical
+        // stuck case; if we get here, the deploy can be cleanly resumed.
         if (!cleared && readCurrentValue(inputAfter).trim().length > 0) {
           if (isLovableGenerating()) {
-            dwarn(`prompt ${i + 1}: input still has text but Lovable is generating — waiting it out, no retry`);
-            cleared = await waitForInputCleared(inputAfter, 60000, baselineMessageCount);
-          } else {
-            dwarn(`prompt ${i + 1} did not clear — pressing Enter once as retry (no button click)`);
-            inputAfter.focus();
-            inputAfter.dispatchEvent(
-              new KeyboardEvent("keydown", {
-                key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true,
-              }),
-            );
-            cleared = await waitForInputCleared(inputAfter, 15000, baselineMessageCount);
+            dwarn(`prompt ${i + 1}: input still has text but Lovable is generating — extending wait`);
+            cleared = await waitForInputCleared(inputAfter, 90000, baselineMessageCount);
           }
           if (cancelRequested) return;
         }
