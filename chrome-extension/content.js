@@ -5,7 +5,7 @@
  * and automates prompt delivery using Lovable's chat input and Queue.
  */
 
-const SELECTOR_VERSION = 11;
+const SELECTOR_VERSION = 12;
 const MAX_REPEAT_COUNT = 50;
 const INSERT_VERIFY_ATTEMPTS = 3;
 const INSERT_VERIFY_DELAY_MS = 300;
@@ -44,7 +44,7 @@ function derr(...args) {
   console.error("[lovplan][content]", ...args);
 }
 
-console.log("[lovplan][content] script loaded on", window.location.href);
+console.log("[lovplan][content] v1.1.12 (selectorVersion=" + SELECTOR_VERSION + ") loaded on", window.location.href);
 
 let cancelRequested = false;
 let pauseRequested = false;
@@ -300,21 +300,14 @@ function getSelectorHealth() {
 function insertText(element, text) {
   element.focus();
 
-  if (element.tagName === "TEXTAREA" || element.tagName === "INPUT") {
+  const isFormControl = element.tagName === "TEXTAREA" || element.tagName === "INPUT";
+
+  if (isFormControl) {
+    // Native form control: select-all then insert. Modern frameworks
+    // (React) need the prototype value setter to fire change detection.
     element.select();
-  } else {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-
-  const ok = document.execCommand("insertText", false, text);
-
-  if (!ok) {
-    console.warn("[LovPlan Deployer] execCommand failed, using setter fallback");
-    if (element.tagName === "TEXTAREA" || element.tagName === "INPUT") {
+    const ok = document.execCommand("insertText", false, text);
+    if (!ok) {
       const proto =
         element.tagName === "TEXTAREA"
           ? HTMLTextAreaElement.prototype
@@ -322,12 +315,42 @@ function insertText(element, text) {
       const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
       if (setter) setter.call(element, text);
       else element.value = text;
-    } else {
-      // contenteditable — avoid nuking siblings by clearing then inserting.
-      element.textContent = "";
-      element.textContent = text;
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
     }
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+
+  // Contenteditable: leftover text from a previous prompt is the main
+  // hazard here. We explicitly clear then insert, and dispatch the events
+  // most React-based chat UIs need to register the change.
+
+  // 1. Select everything inside the element and try to delete it via
+  // execCommand — this is what a Cmd+A + Delete does.
+  const range1 = document.createRange();
+  range1.selectNodeContents(element);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range1);
+  document.execCommand("delete", false);
+
+  // 2. Hard-clear textContent in case execCommand("delete") was a no-op
+  // for this contenteditable variant.
+  if (element.textContent && element.textContent.length > 0) {
+    element.textContent = "";
+  }
+
+  // 3. Insert the new text. execCommand("insertText") is widely supported
+  // by Lexical/Slate/ProseMirror-based chat editors and dispatches the
+  // beforeinput/input events those frameworks listen for.
+  const ok = document.execCommand("insertText", false, text);
+
+  // 4. Setter-based fallback if execCommand was rejected.
+  if (!ok && (!element.textContent || element.textContent.length === 0)) {
+    console.warn("[LovPlan Deployer] execCommand insertText failed on contenteditable, using textContent fallback");
+    element.textContent = text;
+    element.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
+    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
   }
 }
@@ -795,14 +818,18 @@ async function sendOnePrompt(index, total, promptText) {
     return false;
   }
 
-  const sendBtn = getSendButton();
-  if (sendBtn) {
-    dlog("[" + index + "/" + total + "] Clicking send…");
-    sendBtn.click();
-  } else {
-    dlog("[" + index + "/" + total + "] No button, pressing Enter…");
+  // Always press Enter — never click a button. Earlier versions tried to
+  // find a "send" button to click, but Lovable's chat input area has
+  // microphone, stop, and "+" / attachment buttons that are easy to
+  // misidentify. Pressing Enter on the focused chat input is the
+  // unambiguous safe submission method, the same as a human typing.
+  dlog("[" + index + "/" + total + "] Pressing Enter to submit…");
+  input.focus();
+  // Some chat inputs only respond to a full keypress sequence
+  // (keydown + keypress + keyup) rather than just keydown.
+  for (const type of ["keydown", "keypress", "keyup"]) {
     input.dispatchEvent(
-      new KeyboardEvent("keydown", {
+      new KeyboardEvent(type, {
         key: "Enter",
         code: "Enter",
         keyCode: 13,
