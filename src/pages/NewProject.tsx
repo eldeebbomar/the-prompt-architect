@@ -204,7 +204,7 @@ const NewProject = () => {
       queryClient.invalidateQueries({ queryKey: ["credit-stats"] });
 
       if (!createData.idempotent_replay) {
-        toast.success(`1 credit used for project: ${result.data.name}`);
+        toast.success(`Project created: ${result.data.name}`);
       }
       idempotencyKeyRef.current = null;
       navigate(`/project/${project.id}`);
@@ -351,7 +351,7 @@ const NewProject = () => {
           </Button>
 
           <p className="text-center font-body text-xs text-muted-foreground">
-            This will use 1 credit from your account.
+            1 credit will be used when prompts are generated.
           </p>
         </form>
 
