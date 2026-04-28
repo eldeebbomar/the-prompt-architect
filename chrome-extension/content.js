@@ -24,15 +24,21 @@ const FIRST_SEND_PRELUDE_MS = 1500;
 // own input field have practical limits beyond this.
 const MAX_PROMPT_CHARS = 16000;
 
-// Flip to true in development for verbose step-by-step deploy logs. Kept
-// off in releases so the user's DevTools stays clean.
-const DEBUG = false;
+// v1.1.1 DEBUG BUILD: flipped on temporarily so deploy failures surface in
+// the lovable.dev page console. Errors are logged unconditionally; dlog/dwarn
+// gate the verbose per-step trace.
+const DEBUG = true;
 function dlog(...args) {
-  if (DEBUG) console.log("[LovPlan]", ...args);
+  if (DEBUG) console.log("[lovplan][content]", ...args);
 }
 function dwarn(...args) {
-  if (DEBUG) console.warn("[LovPlan]", ...args);
+  if (DEBUG) console.warn("[lovplan][content]", ...args);
 }
+function derr(...args) {
+  console.error("[lovplan][content]", ...args);
+}
+
+console.log("[lovplan][content] script loaded on", window.location.href);
 
 let cancelRequested = false;
 let pauseRequested = false;
@@ -292,9 +298,10 @@ async function sendOnePrompt(index, total, promptText) {
   try {
     input = await waitForInput(15000);
   } catch (e) {
+    derr("waitForInput failed — chat input not present in DOM. URL:", window.location.href, "error:", e);
     chrome.runtime.sendMessage({
       action: "deployError",
-      error: "Chat input not found. Make sure you have a Lovable project open.",
+      error: "Chat input not found. Make sure you have a Lovable project open with the chat input visible.",
     });
     return false;
   }
@@ -303,6 +310,7 @@ async function sendOnePrompt(index, total, promptText) {
 
   const inserted = await insertTextVerified(input, promptText);
   if (!inserted) {
+    derr("insertTextVerified failed for prompt", index, "input element:", input);
     chrome.runtime.sendMessage({
       action: "deployError",
       error:
@@ -359,7 +367,15 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
   cancelRequested = false;
   pauseRequested = false;
 
+  console.log("[lovplan][content] deployPrompts received", {
+    promptCount: Array.isArray(prompts) ? prompts.length : "not-array",
+    projectName,
+    startFromIndex,
+    url: window.location.href,
+  });
+
   if (!Array.isArray(prompts) || prompts.length === 0) {
+    derr("deployPrompts: empty prompt list");
     chrome.runtime.sendMessage({
       action: "deployError",
       error: "No prompts to deploy.",
@@ -478,6 +494,7 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
         if (cancelRequested) return;
         if (!cleared) {
           const lovableError = detectLovableError();
+          derr("input did not clear after send", { promptIndex: i + 1, lovableError });
           chrome.runtime.sendMessage({
             action: "deployError",
             error:
@@ -488,6 +505,8 @@ async function deployPrompts(prompts, projectName, startFromIndex) {
           });
           return;
         }
+      } else {
+        derr("getChatInput returned null after send for prompt", i + 1);
       }
 
       // Even on a clean clear, check for a freshly-mounted error banner —

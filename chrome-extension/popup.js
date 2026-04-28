@@ -379,19 +379,23 @@ async function checkResumeState() {
 
 async function getLovableTab() {
   // Two passes: (1) preferred — active tab in the current window that
-  // matches lovable.dev; (2) fallback — any lovable.dev tab, anywhere.
-  // Returned Tab objects don't carry a `currentWindow` field, so we query
-  // with that filter instead of post-filtering.
-  const matchUrls = ["https://lovable.dev/*"];
+  // matches lovable.dev (apex or any subdomain); (2) fallback — any
+  // lovable.dev tab anywhere. Returned Tab objects don't carry a
+  // `currentWindow` field, so we query with that filter instead of
+  // post-filtering. Subdomain match covers cases where Lovable serves
+  // the editor on www.lovable.dev or similar.
+  const matchUrls = ["https://lovable.dev/*", "https://*.lovable.dev/*"];
 
   const active = await chrome.tabs.query({
     url: matchUrls,
     active: true,
     currentWindow: true,
   });
+  console.log("[lovplan][popup] getLovableTab active query:", active.length, active.map((t) => t.url));
   if (active.length) return active[0];
 
   const anyLovable = await chrome.tabs.query({ url: matchUrls });
+  console.log("[lovplan][popup] getLovableTab fallback query:", anyLovable.length, anyLovable.map((t) => t.url));
   if (!anyLovable.length) return null;
 
   const anyActive = anyLovable.find((t) => t.active);
@@ -426,12 +430,20 @@ let isPaused = false;
 
 async function pingTab(tabId, timeoutMs = 500) {
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(false), timeoutMs);
+    const timer = setTimeout(() => {
+      console.warn("[lovplan][popup] pingTab timeout", { tabId, timeoutMs });
+      resolve(false);
+    }, timeoutMs);
     chrome.tabs.sendMessage(tabId, { action: "ping" }, (response) => {
       clearTimeout(timer);
-      if (chrome.runtime.lastError || !response) {
+      if (chrome.runtime.lastError) {
+        console.warn("[lovplan][popup] pingTab runtime.lastError:", chrome.runtime.lastError.message);
+        resolve(false);
+      } else if (!response) {
+        console.warn("[lovplan][popup] pingTab no response");
         resolve(false);
       } else {
+        console.log("[lovplan][popup] pingTab pong:", response);
         resolve(true);
       }
     });
@@ -439,23 +451,39 @@ async function pingTab(tabId, timeoutMs = 500) {
 }
 
 async function ensureContentScript(tabId) {
-  if (await pingTab(tabId)) return true;
+  console.log("[lovplan][popup] ensureContentScript start, tabId=", tabId);
+  if (await pingTab(tabId)) {
+    console.log("[lovplan][popup] content script already present");
+    return true;
+  }
+  console.log("[lovplan][popup] injecting content.js");
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ["content.js"],
     });
   } catch (err) {
-    console.warn("[popup] injectScript failed:", err);
+    console.error("[lovplan][popup] injectScript failed:", err);
     return false;
   }
   // Give the freshly-injected script a beat to register its listener.
   await new Promise((r) => setTimeout(r, 150));
-  return pingTab(tabId);
+  const ok = await pingTab(tabId);
+  console.log("[lovplan][popup] post-injection ping:", ok);
+  return ok;
 }
 
 async function startDeploy(startFromIndex) {
-  if (currentPrompts.length === 0) return;
+  console.log("[lovplan][popup] startDeploy called", {
+    startFromIndex,
+    promptCount: currentPrompts.length,
+    selectedProjectId,
+    selectedProjectName,
+  });
+  if (currentPrompts.length === 0) {
+    console.warn("[lovplan][popup] startDeploy: no prompts loaded, aborting");
+    return;
+  }
 
   isPaused = false;
   const pauseBtn = document.getElementById("pause-deploy-btn");
@@ -474,18 +502,22 @@ async function startDeploy(startFromIndex) {
 
   const tab = await getLovableTab();
   if (!tab) {
-    if (statusEl) statusEl.textContent = "Error: No Lovable tab found.";
+    console.error("[lovplan][popup] startDeploy FAIL: no Lovable tab found. Open https://lovable.dev/projects/<id> in a tab first.");
+    if (statusEl) statusEl.textContent = "Error: No Lovable tab found. Open a Lovable project tab first.";
     return;
   }
+  console.log("[lovplan][popup] using tab:", { id: tab.id, url: tab.url, active: tab.active });
 
   const ready = await ensureContentScript(tab.id);
   if (!ready) {
+    console.error("[lovplan][popup] startDeploy FAIL: content script not responding on tab", tab.id, tab.url);
     if (statusEl) {
       statusEl.textContent =
         "Error: Could not connect to Lovable page. Refresh the Lovable tab and try again.";
     }
     return;
   }
+  console.log("[lovplan][popup] content script ready");
 
   const resumeKey = `deploy_progress_${selectedProjectId}`;
 
@@ -548,6 +580,7 @@ async function startDeploy(startFromIndex) {
     }
 
     if (message.action === "deployError") {
+      console.error("[lovplan][popup] deployError received:", message);
       chrome.runtime.onMessage.removeListener(progressListener);
       activeProgressListener = null;
       if (statusEl) statusEl.textContent = `Error: ${message.error}`;
@@ -580,13 +613,16 @@ async function startDeploy(startFromIndex) {
   });
 
   try {
+    console.log("[lovplan][popup] sending deploy command to tab", tab.id, "with", currentPrompts.length, "prompts");
     await chrome.tabs.sendMessage(tab.id, {
       action: "deploy",
       prompts: currentPrompts,
       projectName: selectedProjectName,
       startFromIndex: startFromIndex || 0,
     });
+    console.log("[lovplan][popup] deploy command accepted by content script");
   } catch (err) {
+    console.error("[lovplan][popup] sendMessage(deploy) failed:", err);
     if (statusEl) {
       statusEl.textContent =
         "Error: Could not connect to Lovable page. Refresh and try again.";
