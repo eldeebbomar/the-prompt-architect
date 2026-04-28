@@ -393,6 +393,82 @@ export type Database = {
           },
         ]
       }
+      project_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          invited_by: string
+          invited_email: string
+          project_id: string
+          role: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          invited_email: string
+          project_id: string
+          role?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          invited_email?: string
+          project_id?: string
+          role?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_invites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_members: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
@@ -440,11 +516,36 @@ export type Database = {
           },
         ]
       }
+      rate_limit_buckets: {
+        Row: {
+          bucket: string
+          hits: number
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          hits?: number
+          user_id: string
+          window_start?: string
+        }
+        Update: {
+          bucket?: string
+          hits?: number
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      accept_project_invite: {
+        Args: { p_token: string; p_user_id: string }
+        Returns: Json
+      }
       add_credits: {
         Args: {
           p_amount: number
@@ -484,6 +585,15 @@ export type Database = {
         }[]
       }
       owns_project: { Args: { _project_id: string }; Returns: boolean }
+      rate_limit_check: {
+        Args: {
+          p_bucket: string
+          p_max_hits: number
+          p_user_id: string
+          p_window_seconds: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
