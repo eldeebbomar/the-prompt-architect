@@ -35,6 +35,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -84,6 +85,7 @@ const App = () => (
                     <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
                     <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
                     <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/examples" element={<Examples />} />
                     <Route path="/share/:id" element={<SharedProject />} />
