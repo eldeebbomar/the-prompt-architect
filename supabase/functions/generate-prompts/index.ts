@@ -102,6 +102,39 @@ Deno.serve(async (req) => {
       return n8nErrorResponse(result, corsHeaders);
     }
 
+    // n8n sometimes returns HTTP 200 with an error payload (workflow-level
+    // failures don't always map to non-2xx). Inspect the body and surface
+    // user-actionable problems as the right status code so the frontend
+    // can show the credits modal / proper toast instead of silently
+    // marking the project as "generating".
+    const body = result.body as Record<string, unknown> | unknown[];
+    if (body && !Array.isArray(body)) {
+      const errMsg = typeof body.error === "string" ? body.error : "";
+      const code = typeof body.code === "string" ? body.code : "";
+      const blob = `${errMsg} ${code}`.toLowerCase();
+
+      if (
+        blob.includes("insufficient_credits") ||
+        blob.includes("insufficient credits") ||
+        blob.includes("no credits") ||
+        body.error === "INSUFFICIENT_CREDITS"
+      ) {
+        console.warn("[generate-prompts] n8n reported insufficient credits");
+        return new Response(
+          JSON.stringify({ error: "Insufficient credits", code: "insufficient_credits" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (errMsg || code) {
+        console.error("[generate-prompts] n8n returned error body:", body);
+        return new Response(
+          JSON.stringify({ error: errMsg || "Prompt generation failed", code: code || "n8n_error" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     return new Response(JSON.stringify(result.body), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
